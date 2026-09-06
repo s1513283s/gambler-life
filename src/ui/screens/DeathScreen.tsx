@@ -31,8 +31,8 @@ export function DeathScreen() {
       cancelled = true;
       if (url !== null) URL.revokeObjectURL(url);
     };
-    // 只在進入畫面時畫一次；state 在 DEATH/RETIRED 不會再變
-  }, []);
+    // state 在 DEATH/RETIRED 不會再變，實際只畫一次
+  }, [state]);
 
   const onShare = async () => {
     const file = fileRef.current;
