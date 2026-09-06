@@ -4,6 +4,7 @@ import { formatMoney } from '../../engine/death';
 import { useGame } from '../../store';
 import type { NbaBetResult, NbaLegOutcome } from '../../types';
 import { legLabel } from '../../venues/nba';
+import { AnimatedNumber } from '../components/AnimatedNumber';
 
 const OUTCOME_ICON: Record<NbaLegOutcome, string> = { win: '✓', loss: '✗', push: '－' };
 
@@ -64,7 +65,7 @@ function ResultCard({ result }: { result: NbaBetResult }) {
           <span className={`leg-icon ${result.outcomes[i]}`}>{OUTCOME_ICON[result.outcomes[i]]}</span>
           <span className="small">{legLabel(leg)}</span>
           <span className="muted small">
-            {leg.away} {result.scores[i].away} : {result.scores[i].home} {leg.home}
+            {leg.away} <AnimatedNumber value={result.scores[i].away} duration={1400} /> : <AnimatedNumber value={result.scores[i].home} duration={1400} /> {leg.home}
           </span>
         </div>
       ))}

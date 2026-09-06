@@ -21,7 +21,7 @@ export function BaccaratScreen({ session }: Props) {
   const state = useGame((s) => s.state);
   const dispatch = useGame((s) => s.dispatch);
 
-  const minBet = minBetFor('baccarat', state.cash, state.tilt);
+  const minBet = Math.max(minBetFor('baccarat', state.cash, state.tilt), session.vip ? Math.min(CONFIG.VIP_MIN_BET, state.cash) : 0);
   const [side, setSide] = useState<BaccaratSide>('banker');
   // 玩家想押的數字；實際注碼在 render 時夾進合法範圍，現金變動不需要 effect
   const [wantedStake, setStake] = useState(minBet);
@@ -54,7 +54,8 @@ export function BaccaratScreen({ session }: Props) {
 
   return (
     <main className="screen">
-      <section className="table">
+      <section className={`table ${session.vip ? 'table-vip' : ''}`}>
+        {session.vip && <div className="vip-tag">VIP</div>}
         <div className="hand-row">
           <span className="hand-label">閒</span>
           <PlayingCards cards={shown?.hand.player ?? []} revealing={revealing} />
@@ -66,6 +67,11 @@ export function BaccaratScreen({ session }: Props) {
           <span className={`hand-total ${revealing ? 'hidden-until-reveal' : ''}`}>{shown?.hand.bankerTotal ?? ''}</span>
         </div>
         <ResultLine result={revealing ? null : session.lastResult} revealing={revealing} />
+        <div className="road" aria-label="路單">
+          {session.road.map((r, i) => (
+            <span key={i} className={`bead bead-${r}`}>{SIDE_LABEL[r]}</span>
+          ))}
+        </div>
       </section>
 
       <div className="side-grid">

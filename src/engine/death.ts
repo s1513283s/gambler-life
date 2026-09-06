@@ -1,6 +1,7 @@
 import { CONFIG } from '../config';
-import type { DeathCause, GameState } from '../types';
+import type { DeathCause, EndingId, GameState } from '../types';
 import { netWorth } from './economy';
+import { obsessionDef } from './obsessions';
 import { PURCHASES } from './richReducer';
 
 export const DEATH_CAUSE_LABEL: Record<DeathCause, string> = {
@@ -8,6 +9,13 @@ export const DEATH_CAUSE_LABEL: Record<DeathCause, string> = {
   SANITY: '精神崩潰',
   LOAN_SHARK: '被阿龍帶走',
   CLIENT: '賠光金主的錢',
+};
+
+export const ENDING_LABEL: Record<EndingId, string> = {
+  retired: '上岸',
+  fled: '跑路，通緝中',
+  sober: '戒賭，你好了',
+  ruined: '家破人亡',
 };
 
 export interface CardLine {
@@ -29,7 +37,7 @@ export function buildDeathCard(state: GameState): { title: string; lines: CardLi
   const lines: CardLine[] = [
     {
       label: retired ? '結局' : '死因',
-      value: retired ? `上岸，淨值 ${formatMoney(netWorth(state))}` : cause,
+      value: state.ending !== null ? ENDING_LABEL[state.ending] + (retired ? `，淨值 ${formatMoney(netWorth(state))}` : `。${cause}`) : retired ? `上岸，淨值 ${formatMoney(netWorth(state))}` : cause,
     },
     { label: '身分', value: `${bg?.name ?? ''}${state.mode === 'daily' ? ` · 每日挑戰 ${state.dailyKey ?? ''}` : ''}` },
     { label: '淨值最高', value: formatMoney(s.peakNetWorth) },
@@ -55,5 +63,8 @@ export function buildDeathCard(state: GameState): { title: string; lines: CardLi
     lines.push({ label: '21 點基本策略正確率', value: `${accuracy}%` });
   }
 
-  return { title: retired ? `第 ${state.day} 天，上岸` : `第 ${state.day} 天`, lines };
+  const obsession = obsessionDef(state.obsession.id);
+  lines.push({ label: '執念', value: `${obsession.text}${state.obsession.done ? ' ✓' : ' ✗'}` });
+  const suffix = state.ending !== null ? `，${ENDING_LABEL[state.ending].split('，')[0]}` : retired ? '，上岸' : '';
+  return { title: `第 ${state.day} 天${suffix}`, lines };
 }

@@ -1,11 +1,9 @@
-import type { EventDef } from './types';
-
 /**
  * 所有可調數值的唯一真相來源。
  * 調平衡只改這裡，engine 與 ui 不得硬編數字。
  */
 export const CONFIG = {
-  SAVE_VERSION: 10,
+  SAVE_VERSION: 11,
 
   // 經濟
   START_CASH: 15000,
@@ -183,17 +181,42 @@ export const CONFIG = {
   DEATH_CARD_WIDTH: 1080,
   DEATH_CARD_HEIGHT: 1350,
 
-  // 事件表（NIGHT 觸發，每晚最多一個；weight 總和 100）
-  EVENT_TABLE: [
-    { id: 'nothing', weight: 60 },
-    { id: 'bike_broke', weight: 8, cash: -2000 },
-    { id: 'friend_repays', weight: 6, cash: 1500 },
-    { id: 'overtime_pay', weight: 6, cash: 400, requiresWork: true },
-    { id: 'rent_hike', weight: 5, expenseMultiplier: 1.1 },
-    { id: 'found_money', weight: 5, cash: 500 },
-    { id: 'sick', weight: 5, sanity: -10, blocksWorkTomorrow: true },
-    { id: 'insider_tip', weight: 5, insiderTip: true },
-  ] as const satisfies readonly EventDef[],
+  // 打工種類：日班穩、外送浮動、夜班保全較不傷精神。背景的 wage 是日班基準，其餘依比例縮放。
+  JOBS: [
+    { id: 'day', name: '日班', wageMin: 800, wageMax: 800, sanityCost: 15, blurb: '穩穩的' },
+    { id: 'delivery', name: '外送', wageMin: 500, wageMax: 1300, sanityCost: 15, blurb: '看運氣' },
+    { id: 'night', name: '夜班保全', wageMin: 700, wageMax: 700, sanityCost: 10, blurb: '可以邊看球' },
+  ],
+
+  // 人物關係與事件鏈
+  RELATION_LEAVE_THRESHOLD: -4, // 家人好感低於此值就離開
+  PROMISE_DAYS: 5, // 答應家人戒賭後幾天內不能進場子
+  CHOICE_EVENT_WEIGHT: 20, // 選擇題事件在隨機表裡的權重（會從無事發生扣）
+
+  // 執念：每局抽一個，達成獎勵
+  OBSESSION_REWARD_CASH: 10000,
+  OBSESSION_REWARD_SANITY: 15,
+
+  // 結局
+  FLEE_COST: 50000, // 跑路機票
+  FLEE_DEBT_RATIO: 0.8, // 欠款達上限的幾成才會想跑
+  SOBER_DAYS: 15, // 連續幾天不進場子可以收手
+  SOBER_MIN_DAY: 20,
+
+  // 場子深度
+  VIP_MIN_BET: 10000,
+  VIP_COMMISSION: 0.025, // VIP 桌莊抽水減半
+  VIP_BANKER_EDGE: 0.0053,
+  BACCARAT_ROAD_LENGTH: 30,
+  CARD_COUNT_UNLOCK_DECISIONS: 30, // 21 點打過幾手後顯示算牌數
+  MEME_MIN: 500,
+  MEME_MOON_P: 0.09, // 土狗幣噴的機率
+  MEME_MULT: 10,
+  MEME_RUG_SANITY: 10,
+  STREAK_HOT: 3, // 連贏幾把桌面發光
+  STREAK_COLD: 3, // 連輸幾把阿龍出聲
+  NEWS_TRUTH_P: 0.5, // 睡前新聞一半是真的
+
 } as const;
 
 export type Config = typeof CONFIG;

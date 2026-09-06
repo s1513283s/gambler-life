@@ -28,6 +28,7 @@ export function newCryptoSession(): CryptoSession {
     handsPlayed: 0,
     net: 0,
     lastResult: null,
+    lastMeme: null,
   };
 }
 
@@ -106,7 +107,24 @@ function closePosition(state: GameState, session: CryptoSession, exitPrice: numb
     net: session.net + result.pnl,
     lastResult: { position, exitPrice, exitIndex, reason, pnl: result.pnl },
   };
-  return applyRoundResult({ ...state, cash: state.cash + result.returned, venue: next }, 'crypto', result.pnl, sanityDelta);
+  const stats = reason === 'liquidated' ? { ...state.stats, liquidations: state.stats.liquidations + 1 } : state.stats;
+  return applyRoundResult({ ...state, cash: state.cash + result.returned, venue: next, stats }, 'crypto', result.pnl, sanityDelta);
+}
+
+/** CRYPTO_MEME：土狗幣，即時結算。九成歸零、一成十倍，EV 約 -10%。 */
+export function cryptoMeme(state: GameState, rawStake: number): GameState {
+  const session = cryptoSession(state);
+  if (session === null || session.position !== null) return state;
+  const stake = Math.floor(rawStake);
+  if (!Number.isFinite(stake) || stake < CONFIG.MEME_MIN || stake > state.cash) return state;
+  const step = rngStep(state.rngState);
+  const moon = step.value < CONFIG.MEME_MOON_P;
+  const payout = moon ? stake * CONFIG.MEME_MULT : 0;
+  const net = payout - stake;
+  const wagered = recordWager({ ...state, rngState: step.state }, 'crypto', stake, stake * (1 - CONFIG.MEME_MOON_P * CONFIG.MEME_MULT));
+  const stats = { ...wagered.stats, memeMoons: wagered.stats.memeMoons + (moon ? 1 : 0), memeRugs: wagered.stats.memeRugs + (moon ? 0 : 1) };
+  const next: CryptoSession = { ...session, handsPlayed: session.handsPlayed + 1, net: session.net + net, lastMeme: { stake, moon, payout } };
+  return applyRoundResult({ ...wagered, cash: state.cash - stake + payout, venue: next, stats }, 'crypto', net, moon ? CONFIG.GAMBLE_WIN_SANITY : -CONFIG.MEME_RUG_SANITY);
 }
 
 /** CRYPTO_TICK：推進一根，依序檢查爆倉 / 停損 / 停利，最後一根自動平倉。 */

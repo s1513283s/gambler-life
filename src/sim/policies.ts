@@ -1,5 +1,6 @@
 import { CONFIG } from '../config';
 import { loanRoom } from '../engine/economy';
+import { eventDef } from '../engine/events';
 import type { Rng } from '../engine/rng';
 import type { BaccaratSide, BlackjackMove, BlackjackRound, CryptoDirection, GameAction, GameState, NbaLegPick, VenueKind } from '../types';
 import { canBetAt, minBetFor } from '../venues/betting';
@@ -27,7 +28,11 @@ export function dailyPolicy(choose: DayChooser): Policy {
       case 'NIGHT': {
         const night = state.night;
         if (night === null) throw new Error('NIGHT without report');
-        if (night.step === 'EVENT') return { type: 'NIGHT_ACK_EVENT' };
+        if (night.step === 'EVENT') {
+          const def = eventDef(night.event);
+          if (def.choices && night.resultText === null) return { type: 'NIGHT_CHOOSE', index: rng.int(def.choices.length) };
+          return { type: 'NIGHT_ACK_EVENT' };
+        }
         if (night.step === 'LIQUIDATE') {
           // 預設砍倉策略：一支一支全賣，補到夠為止
           if (night.shortfall > 0 && state.stockPositions.length > 0) {

@@ -62,6 +62,7 @@ export interface BatchSummary {
   max: number;
   rentPct: number;
   sanityPct: number;
+  otherDeathPct: number;
   retiredPct: number;
   timeoutPct: number;
   avgLoans: number;
@@ -89,6 +90,7 @@ export function summarize(results: RunResult[]): BatchSummary {
     max: days[n - 1] ?? 0,
     rentPct: pct((r) => r.cause === 'RENT'),
     sanityPct: pct((r) => r.cause === 'SANITY'),
+    otherDeathPct: pct((r) => r.ended === 'DEATH' && r.cause !== 'RENT' && r.cause !== 'SANITY'),
     retiredPct: pct((r) => r.ended === 'RETIRED'),
     timeoutPct: pct((r) => r.ended === 'TIMEOUT'),
     avgLoans: avg((r) => r.loansTaken),

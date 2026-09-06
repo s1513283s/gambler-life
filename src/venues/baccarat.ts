@@ -79,13 +79,13 @@ export function needsReshuffle(shoeLength: number, cursor: number): boolean {
 }
 
 /** 退還給玩家的總額（含本金）。和局時押莊押閒退本金。 */
-export function payoutFor(side: BaccaratSide, stake: number, outcome: BaccaratSide): number {
+export function payoutFor(side: BaccaratSide, stake: number, outcome: BaccaratSide, commission: number = CONFIG.BACCARAT_COMMISSION): number {
   if (outcome === 'tie') {
     if (side === 'tie') return stake + stake * CONFIG.BACCARAT_TIE_PAYOUT;
     return stake;
   }
   if (side !== outcome) return 0;
-  if (side === 'banker') return stake + Math.floor(stake * (1 - CONFIG.BACCARAT_COMMISSION));
+  if (side === 'banker') return stake + Math.floor(stake * (1 - commission));
   return stake * 2;
 }
 

@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { recordAchievements, type AchievementDef } from './analytics/achievements';
 import { markRetired } from './analytics/meta';
 import { browserStore, recordRun } from './analytics/runlog';
 import { CONFIG } from './config';
@@ -24,6 +25,12 @@ export const useGame = create<GameStore>((set, get) => ({
 }));
 
 const FINISHED: readonly string[] = ['DEATH', 'RETIRED'];
+let freshAchievements: AchievementDef[] = [];
+
+/** 最近一局結束時新拿到的成就，死亡畫面顯示用 */
+export function lastNewAchievements(): AchievementDef[] {
+  return freshAchievements;
+}
 
 // 每次狀態變動立即寫入；一局結束時順便寫排行榜與 run 紀錄。
 useGame.subscribe((store, prevStore) => {
@@ -34,6 +41,7 @@ useGame.subscribe((store, prevStore) => {
   if (FINISHED.includes(next.phase) && !FINISHED.includes(prev.phase) && next.runId === prev.runId) {
     recordRun(browserStore(), next);
     if (next.phase === 'RETIRED') markRetired(browserStore());
+    freshAchievements = recordAchievements(browserStore(), next);
   }
 });
 

@@ -14,13 +14,16 @@ export function applyRoundResult(state: GameState, kind: VenueId, net: number, s
   const byVenue = { ...state.stats.byVenue };
   byVenue[kind] = { ...byVenue[kind], net: byVenue[kind].net + net };
   const s = state.stats;
+  const streak = net > 0 ? Math.max(1, state.venueStreak + 1) : net < 0 ? Math.min(-1, state.venueStreak - 1) : state.venueStreak;
   return applyUnlocks(
     withPeak({
       ...state,
       sanity: clampSanity(state.sanity + sanityDelta),
       venueNetToday: state.venueNetToday + net,
+      venueStreak: streak,
       stats: {
         ...s,
+        maxWinStreak: Math.max(s.maxWinStreak, streak),
         biggestWin: Math.max(s.biggestWin, net),
         biggestWinDay: net > s.biggestWin ? state.day : s.biggestWinDay,
         biggestLoss: Math.min(s.biggestLoss, net),

@@ -5,7 +5,7 @@ import { forcedHandsLeft } from '../../engine/venueReducer';
 import { useGame } from '../../store';
 import type { BjHand, BlackjackMove, BlackjackSession } from '../../types';
 import { canBetAt, clampStake, minBetFor } from '../../venues/betting';
-import { canSplitCards, handValue } from '../../venues/blackjack';
+import { canSplitCards, countShoe, handValue } from '../../venues/blackjack';
 import { PlayingCards } from '../components/PlayingCards';
 import { StakeControl } from '../components/StakeControl';
 import { VenueFooter } from '../components/VenueFooter';
@@ -51,6 +51,7 @@ export function BlackjackScreen({ session }: Props) {
       ? `策略正確率 ${Math.round(((state.stats.bjDecisions - state.stats.bjMistakes) / state.stats.bjDecisions) * 100)}%`
       : undefined;
   const affordable = canBetAt('blackjack', state.cash);
+  const count = state.stats.bjDecisions >= CONFIG.CARD_COUNT_UNLOCK_DECISIONS ? countShoe(session.shoe, session.cursor) : null;
 
   return (
     <main className="screen">
@@ -64,6 +65,12 @@ export function BlackjackScreen({ session }: Props) {
           <HandLine key={i} hand={h} active={playing && round?.active === i} payout={stage === 'DONE' ? round?.payouts[i] : undefined} />
         ))}
         <ResultLine round={round} />
+        {count !== null && (
+          <div className={`count-line ${count.trueCount >= 2 ? 'ok' : count.trueCount <= -2 ? 'danger' : 'muted'}`}>
+            流水數 {count.running > 0 ? '+' : ''}{count.running} · 真數 {count.trueCount.toFixed(1)} · 剩 {count.decksLeft.toFixed(1)} 副
+            {count.trueCount >= 2 ? ' · 牌靴偏大，加注' : ''}
+          </div>
+        )}
       </section>
 
       {betting ? (

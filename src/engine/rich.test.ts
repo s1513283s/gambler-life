@@ -1,7 +1,20 @@
 import { describe, expect, it } from 'vitest';
 import { CONFIG } from '../config';
 import type { GameState } from '../types';
+import { eventDef } from './events';
 import { createTitleState, reduce } from './reducer';
+
+/** 事件步：選擇題先選第一個，有結果文字再確認；一般事件直接確認 */
+function passEvent(s: GameState): GameState {
+  if (s.night?.step !== 'EVENT') return s;
+  const choices = eventDef(s.night.event).choices;
+  if (choices && s.night.resultText === null) {
+    const free = choices.findIndex((c) => (c.effects.cash ?? 0) >= 0);
+    s = reduce(s, { type: 'NIGHT_CHOOSE', index: free >= 0 ? free : 0 });
+  }
+  if (s.night?.step === 'EVENT') s = reduce(s, { type: 'NIGHT_ACK_EVENT' });
+  return s;
+}
 
 function richRun(cash = 1000000): GameState {
   const s = reduce(createTitleState(), { type: 'NEW_RUN', seed: 5, runId: 'rich', mode: 'free', dailyKey: null, background: 'normal' });
@@ -15,7 +28,7 @@ function richRun(cash = 1000000): GameState {
 
 function settle(s: GameState): GameState {
   s = reduce({ ...s, rngState: 0 }, { type: 'END_DAY' });
-  if (s.night?.step === 'EVENT') s = reduce(s, { type: 'NIGHT_ACK_EVENT' });
+  s = passEvent(s);
   if (s.night?.step === 'LIQUIDATE') s = reduce(s, { type: 'NIGHT_SKIP_LIQUIDATE' });
   return s;
 }
@@ -73,9 +86,9 @@ describe('rich tier', () => {
     expect(reduce(s, { type: 'LEND', amount: 1000 })).toBe(s);
     let defaults = 0;
     let interest = 0;
-    for (let i = 0; i < 30 && s.lends.length > 0; i++) {
+    for (let i = 0; i < 30 && s.lends.length > 0 && s.phase === 'ACTION'; i++) {
       s = reduce({ ...s, rngState: 1000 + i }, { type: 'END_DAY' });
-      if (s.night?.step === 'EVENT') s = reduce(s, { type: 'NIGHT_ACK_EVENT' });
+      s = passEvent(s);
       if (s.night?.step !== 'SETTLE') throw new Error('no settle');
       defaults += s.night.lendDefaulted;
       interest += s.night.lendInterest;

@@ -147,3 +147,25 @@ export function settleHand(hand: BjHand, dealer: readonly Card[]): number {
 export function needsReshuffle(shoeLength: number, cursor: number): boolean {
   return shoeLength - cursor < CONFIG.BLACKJACK_CUT_CARD;
 }
+
+/** Hi-Lo：2-6 算 +1，10/J/Q/K/A 算 -1，7-9 算 0。 */
+export function hiLoValue(card: Card): number {
+  const p = cardPoints(card);
+  if (p >= 2 && p <= 6) return 1;
+  if (p >= 10) return -1;
+  return 0;
+}
+
+export interface CountInfo {
+  running: number;
+  trueCount: number;
+  decksLeft: number;
+}
+
+/** 已發出去的牌（牌靴 0..cursor）的流水數與真數 */
+export function countShoe(shoe: readonly Card[], cursor: number): CountInfo {
+  let running = 0;
+  for (let i = 0; i < cursor && i < shoe.length; i++) running += hiLoValue(shoe[i]);
+  const decksLeft = Math.max(0.5, (shoe.length - cursor) / 52);
+  return { running, trueCount: running / decksLeft, decksLeft };
+}

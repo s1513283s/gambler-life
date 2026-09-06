@@ -173,6 +173,13 @@ export interface RunStats {
   parlaysWon: number;
   bjDecisions: number; // 21 點決策數
   bjMistakes: number; // 偏離基本策略次數
+  liquidations: number;
+  scratchJackpots: number;
+  maxParlayLegsWon: number;
+  maxWinStreak: number;
+  memeMoons: number;
+  memeRugs: number;
+  venuesVisited: VenueId[];
   byVenue: Record<VenueId, VenueStats>;
   causeOfDeath?: DeathCause;
 }
@@ -195,19 +202,79 @@ export type EventId =
   | 'rent_hike'
   | 'found_money'
   | 'sick'
-  | 'insider_tip';
+  | 'insider_tip'
+  // 房東
+  | 'landlord_raise'
+  | 'landlord_return'
+  // 阿明
+  | 'friend_venture'
+  | 'friend_venture_result'
+  | 'friend_borrow'
+  | 'friend_borrow_result'
+  | 'friend_tip_meme'
+  // 家人
+  | 'family_birthday'
+  | 'family_discovers'
+  | 'family_medical'
+  | 'family_leaves'
+  | 'family_promise_broken';
 
-/** 事件表的一列。效果欄位全部可選，沒寫就是沒有該效果。 */
-export interface EventDef {
-  id: EventId;
-  weight: number;
+/** 一個效果包。全部可選；roll 是機率分支，套用時用遊戲 rng 擲一次。 */
+export interface EventEffect {
   cash?: number;
   sanity?: number;
   expenseMultiplier?: number; // 乘上去，永久
-  requiresWork?: boolean; // 當天沒打工則視為無事發生
   blocksWorkTomorrow?: boolean;
   insiderTip?: boolean; // 明天 NBA 某場顯示內線標記
+  family?: number; // 家人好感增減
+  friend?: number; // 阿明好感增減
+  friendGone?: boolean;
+  familyGone?: boolean;
+  promise?: boolean; // 答應家人戒賭
+  schedule?: { id: EventId; inDays: number }; // 幾天後觸發後續事件
+  roll?: { p: number; text: string; effects: EventEffect }[]; // 機率分支，p 相加要 <= 1，剩下走最後一個
 }
+
+export interface EventChoice {
+  label: string;
+  effects: EventEffect;
+}
+
+/** 事件表的一列。沒有 choices 的事件在擲到時直接套用；有 choices 的等玩家選。 */
+export interface EventDef extends EventEffect {
+  id: EventId;
+  weight: number; // 0 = 只能被排程觸發
+  text: string;
+  requiresWork?: boolean; // 當天沒打工則視為無事發生
+  choices?: EventChoice[];
+  /** 出現條件；沒寫就是隨時可能 */
+  condition?: 'hasFriend' | 'hasFamily' | 'gambledSome' | 'hasFamilyNoPromise';
+}
+
+/** 家人與阿明的關係值，離開後不再有相關事件 */
+export interface Relations {
+  family: number;
+  friend: number;
+  familyGone: boolean;
+  friendGone: boolean;
+}
+
+export interface ScheduledEvent {
+  day: number;
+  id: EventId;
+}
+
+export type JobId = 'day' | 'delivery' | 'night';
+
+export type ObsessionId = 'net200k' | 'parlay6' | 'survive30' | 'noLoan20' | 'scratch20x' | 'bjAccuracy' | 'buyHouse' | 'streak5';
+
+export interface Obsession {
+  id: ObsessionId;
+  done: boolean;
+}
+
+/** 結局：死因以外的收尾方式 */
+export type EndingId = 'retired' | 'fled' | 'sober' | 'ruined';
 
 /** 0-51：rank = card % 13（0 = A … 12 = K），suit = floor(card / 13） */
 export type Card = number;
@@ -235,6 +302,8 @@ export interface BaccaratResult extends BaccaratPending {
 
 export interface BaccaratSession {
   kind: 'baccarat';
+  vip: boolean; // VIP 桌：最低注高、抽水減半
+  road: BaccaratSide[]; // 路單，最近幾局結果
   shoe: Card[];
   cursor: number; // 下一張要發的位置
   handsPlayed: number;
@@ -317,8 +386,15 @@ export interface CryptoSegmentRef {
   candles: Candle[];
 }
 
+export interface MemeResult {
+  stake: number;
+  moon: boolean;
+  payout: number;
+}
+
 export interface CryptoSession {
   kind: 'crypto';
+  lastMeme: MemeResult | null;
   segment: CryptoSegmentRef | null; // null = 等 UI 載入資料後 NEW_SEGMENT
   cursor: number; // 目前顯示到第幾根（含）
   playing: boolean; // TICK 推進中
@@ -399,7 +475,7 @@ export interface LongmenSession {
 export type VenueSession = BaccaratSession | BlackjackSession | ScratchSession | CryptoSession | SicboSession | NiuniuSession | LongmenSession;
 export type VenueKind = VenueSession['kind'];
 
-export type NightOutcome = 'CONTINUE' | 'RETIRE_OFFER' | 'DEATH';
+export type NightOutcome = 'CONTINUE' | 'RETIRE_OFFER' | 'SOBER_OFFER' | 'DEATH';
 
 export interface NightSettlement {
   step: 'SETTLE';
@@ -414,6 +490,8 @@ export interface NightSettlement {
   propertyChange: number; // 預售屋權益變動
   propertyMarginCall: boolean;
   managedSettled: { profit: number; paid: number } | null; // 代操到期結算
+  news: string; // 睡前新聞，一半是真的
+  eventResultText: string | null; // 選擇題事件的分支結果文字
   outcome: NightOutcome;
   deathCause: DeathCause | null;
 }
@@ -423,7 +501,7 @@ export interface NightSettlement {
  * 每一步都存在 state 裡，重整後從同一步續玩。
  */
 export type NightReport =
-  | { step: 'EVENT'; event: EventId }
+  | { step: 'EVENT'; event: EventId; resultText: string | null }
   | { step: 'LIQUIDATE'; shortfall: number } // 還差多少才付得出今晚開銷
   | NightSettlement;
 
@@ -470,6 +548,14 @@ export interface GameState {
   lends: Lend[];
   managed: Managed | null;
   property: Property | null;
+  relations: Relations;
+  scheduled: ScheduledEvent[];
+  promiseUntilDay: number; // 答應家人戒賭到第幾天，0 = 沒有
+  obsession: Obsession;
+  ending: EndingId | null;
+  daysSinceGamble: number;
+  venueStreak: number; // 本次進場連贏（正）或連輸（負）
+  lastJob: JobId | null;
   night: NightReport | null;
   stats: RunStats;
   history: DayLog[];
@@ -484,11 +570,15 @@ export type GameAction =
   | { type: 'ACCEPT_MANAGE' } // 接代操
   | { type: 'BUY_PRESALE'; amount: number } // 付頭期款
   | { type: 'SELL_PRESALE' } // 提前賣掉
-  | { type: 'WORK' }
+  | { type: 'WORK'; job?: JobId } // 預設日班
   | { type: 'REST' }
   | { type: 'BORROW'; amount: number } // 不佔主行動
   | { type: 'REPAY'; amount: number } // 不佔主行動
-  | { type: 'ENTER_VENUE'; venue: VenueKind } // ACTION -> VENUE，佔主行動
+  | { type: 'ENTER_VENUE'; venue: VenueKind; vip?: boolean } // ACTION -> VENUE，佔主行動
+  | { type: 'CRYPTO_MEME'; stake: number } // 土狗幣，即時結算
+  | { type: 'NIGHT_CHOOSE'; index: number } // 選擇題事件
+  | { type: 'FLEE' } // 跑路結局
+  | { type: 'SOBER' } // 戒賭結局
   | { type: 'BACCARAT_BET'; side: BaccaratSide; stake: number } // 扣注金、發牌
   | { type: 'BACCARAT_RESOLVE' } // 派彩、精神、統計
   | { type: 'BLACKJACK_DEAL'; stake: number } // 扣注金、發牌、檢查黑傑克

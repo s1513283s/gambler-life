@@ -46,6 +46,6 @@ describe('simulator', () => {
     expect(s.runs).toBe(50);
     expect(s.min).toBeLessThanOrEqual(s.median);
     expect(s.median).toBeLessThanOrEqual(s.max);
-    expect(s.rentPct + s.sanityPct + s.retiredPct + s.timeoutPct).toBeCloseTo(100);
+    expect(s.rentPct + s.sanityPct + s.otherDeathPct + s.retiredPct + s.timeoutPct).toBeCloseTo(100);
   });
 });

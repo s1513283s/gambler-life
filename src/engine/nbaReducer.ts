@@ -93,7 +93,11 @@ export function eveningReveal(state: GameState): GameState {
     cash: state.cash + payout,
     nbaBets: state.nbaBets.slice(1),
     nbaResults: [...state.nbaResults, result],
-    stats: { ...state.stats, parlaysWon: state.stats.parlaysWon + (isParlay && net > 0 ? 1 : 0) },
+    stats: {
+      ...state.stats,
+      parlaysWon: state.stats.parlaysWon + (isParlay && net > 0 ? 1 : 0),
+      maxParlayLegsWon: net > 0 ? Math.max(state.stats.maxParlayLegsWon, bet.legs.length) : state.stats.maxParlayLegsWon,
+    },
   };
   return applyRoundResult(next, isParlay ? 'parlay' : 'nba', net, sanityDelta);
 }

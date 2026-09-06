@@ -116,6 +116,22 @@ export function CryptoScreen({ session }: Props) {
 
       {canConfigure && (
         <>
+          <section className="card meme-card">
+            <div className="hero-row">
+              <div>
+                <div className="shop-name">土狗幣</div>
+                <div className="muted small">{Math.round((1 - CONFIG.MEME_MOON_P) * 100)}% 歸零、{Math.round(CONFIG.MEME_MOON_P * 100)}% 十倍。即時開獎。</div>
+              </div>
+              <button className="btn btn-small" disabled={state.cash < CONFIG.MEME_MIN} onClick={() => dispatch({ type: 'CRYPTO_MEME', stake: Math.max(CONFIG.MEME_MIN, Math.min(margin, state.cash)) })}>
+                梭 ${formatMoney(Math.max(CONFIG.MEME_MIN, Math.min(margin, state.cash)))}
+              </button>
+            </div>
+            {session.lastMeme !== null && (
+              <p className={session.lastMeme.moon ? 'ok big' : 'danger'}>
+                {session.lastMeme.moon ? `噴了！+${formatMoney(session.lastMeme.payout - session.lastMeme.stake)}` : `歸零。-${formatMoney(session.lastMeme.stake)}`}
+              </p>
+            )}
+          </section>
           <div className="side-grid two">
             <button className={`btn side-btn ${direction === 'long' ? 'side-active' : ''}`} onClick={() => setDirection('long')}>
               <span className="btn-title ok">做多</span>

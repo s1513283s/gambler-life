@@ -1,12 +1,24 @@
 import { describe, expect, it } from 'vitest';
 import { CONFIG } from '../config';
 import type { Candle, CryptoSegment, NbaGame, NbaGameDay, StockSegment } from '../data/schema';
-import { VENUE_IDS, type EventDef, type GameAction, type GameState } from '../types';
+import { VENUE_IDS, type GameAction, type GameState } from '../types';
 import { buildDeathCard } from './death';
-import { applyEvent, rollEvent } from './events';
+import { EVENTS, applyEffect, eventDef, pickEvent } from './events';
 import { createTitleState, reduce } from './reducer';
 
 type Policy = (state: GameState) => 'WORK' | 'REST';
+
+/** 事件步：選擇題先選第一個，有結果文字再確認；一般事件直接確認 */
+function passEvent(s: GameState): GameState {
+  if (s.night?.step !== 'EVENT') return s;
+  const choices = eventDef(s.night.event).choices;
+  if (choices && s.night.resultText === null) {
+    const free = choices.findIndex((c) => (c.effects.cash ?? 0) >= 0);
+    s = reduce(s, { type: 'NIGHT_CHOOSE', index: free >= 0 ? free : 0 });
+  }
+  if (s.night?.step === 'EVENT') s = reduce(s, { type: 'NIGHT_ACK_EVENT' });
+  return s;
+}
 
 function newRun(seed = 1): GameState {
   return reduce(createTitleState(), { type: 'NEW_RUN', seed, runId: 'test', mode: 'free', dailyKey: null, background: 'normal' });
@@ -16,7 +28,7 @@ function newRun(seed = 1): GameState {
 function playDay(s: GameState, action: GameAction): GameState {
   s = reduce(s, action);
   s = reduce(s, { type: 'END_DAY' });
-  if (s.night?.step === 'EVENT') s = reduce(s, { type: 'NIGHT_ACK_EVENT' });
+  s = passEvent(s);
   return reduce(s, { type: 'NEXT_DAY' });
 }
 
@@ -24,12 +36,6 @@ function playUntilDeath(policy: Policy, seed = 1, maxDays = 500): GameState {
   let s = newRun(seed);
   while (s.phase !== 'DEATH' && s.day <= maxDays) s = playDay(s, { type: policy(s) });
   return s;
-}
-
-function eventDef(id: EventDef['id']): EventDef {
-  const def = CONFIG.EVENT_TABLE.find((e) => e.id === id);
-  if (def === undefined) throw new Error(`no event ${id}`);
-  return def;
 }
 
 describe('phase guard', () => {
@@ -52,7 +58,7 @@ describe('phase guard', () => {
 
   it('NEXT_DAY is ignored while the event modal is open', () => {
     let s = newRun();
-    s = { ...s, phase: 'NIGHT', night: { step: 'EVENT', event: 'sick' } };
+    s = { ...s, phase: 'NIGHT', night: { step: 'EVENT', event: 'sick', resultText: null } };
     expect(reduce(s, { type: 'NEXT_DAY' })).toBe(s);
     expect(reduce(s, { type: 'NIGHT_ACK_EVENT' }).night?.step).toBe('SETTLE');
   });
@@ -64,7 +70,7 @@ describe('economy', () => {
     expect(s.cash).toBe(CONFIG.START_CASH);
     expect(s.sanity).toBe(CONFIG.SANITY_START);
     expect(s.dailyExpense).toBe(CONFIG.BASE_EXPENSE);
-    expect(s.rngState).toBe(1);
+    expect(s.obsession.done).toBe(false);
 
     const d = playDay({ ...s, rngState: 0 }, { type: 'END_DAY' });
     expect(d.day).toBe(2);
@@ -94,7 +100,7 @@ describe('economy', () => {
     while (s.phase !== 'DEATH') {
       s = reduce(s, { type: s.day % 3 === 0 ? 'REST' : 'WORK' });
       s = reduce(s, { type: 'END_DAY' });
-      if (s.night?.step === 'EVENT') s = reduce(s, { type: 'NIGHT_ACK_EVENT' });
+      s = passEvent(s);
       if (s.night?.step === 'SETTLE' && s.night.autoLoan > 0) {
         sawLoan = true;
         expect(s.cash).toBe(0);
@@ -135,7 +141,7 @@ describe('loan shark', () => {
     expect(reduce(s, { type: 'REPAY', amount: 0 })).toBe(s);
 
     s = reduce({ ...s, rngState: 0 }, { type: 'END_DAY' });
-    if (s.night?.step === 'EVENT') s = reduce(s, { type: 'NIGHT_ACK_EVENT' });
+    s = passEvent(s);
     expect(s.night?.step).toBe('SETTLE');
     expect(s.debt).toBe(6000 + Math.round(6000 * CONFIG.LOAN_DAILY_RATE));
   });
@@ -151,57 +157,58 @@ describe('loan shark', () => {
 });
 
 describe('events', () => {
-  it('weights sum to 100 and the roll distribution matches within 2 points', () => {
-    const total = CONFIG.EVENT_TABLE.reduce((sum, e) => sum + e.weight, 0);
-    expect(total).toBe(100);
-
+  it('random weights sum to 100 and the pick distribution matches within 2 points', () => {
+    const random = EVENTS.filter((e) => e.weight > 0);
+    expect(random.reduce((sum, e) => sum + e.weight, 0)).toBe(100);
+    const base = { ...newRun(), stats: { ...newRun().stats, daysGambled: 5 } };
     const counts = new Map<string, number>();
-    let rng = 12345;
+    let s = base;
     const n = 20000;
     for (let i = 0; i < n; i++) {
-      const roll = rollEvent(rng, true);
-      rng = roll.rngState;
-      counts.set(roll.event.id, (counts.get(roll.event.id) ?? 0) + 1);
+      const pick = pickEvent(s, true);
+      s = { ...s, rngState: pick.rngState };
+      counts.set(pick.event.id, (counts.get(pick.event.id) ?? 0) + 1);
     }
-    for (const def of CONFIG.EVENT_TABLE) {
+    for (const def of random) {
       const pct = ((counts.get(def.id) ?? 0) / n) * 100;
       expect(Math.abs(pct - def.weight), def.id).toBeLessThan(2);
     }
   });
 
   it('overtime pay downgrades to nothing on a day without work', () => {
-    let rng = 0;
+    let s = newRun();
     let sawOvertime = false;
     for (let i = 0; i < 5000; i++) {
-      const worked = rollEvent(rng, true);
-      const idle = rollEvent(rng, false);
+      const worked = pickEvent(s, true);
+      const idle = pickEvent(s, false);
       if (worked.event.id === 'overtime_pay') {
         sawOvertime = true;
         expect(idle.event.id).toBe('nothing');
       }
-      rng = worked.rngState;
+      s = { ...s, rngState: worked.rngState };
     }
     expect(sawOvertime).toBe(true);
   });
 
   it('applies cash, sanity, multiplier and flags', () => {
     const s = newRun();
-    expect(applyEvent(s, eventDef('bike_broke')).cash).toBe(CONFIG.START_CASH - 2000);
-    expect(applyEvent(s, eventDef('sick'))).toMatchObject({ sanity: 70, workBlockedUntilDay: 2 });
-    expect(applyEvent(s, eventDef('insider_tip')).insiderTipDay).toBe(2);
-    expect(applyEvent(s, eventDef('rent_hike')).expenseMultiplier).toBeCloseTo(1.1);
-    expect(applyEvent(s, eventDef('nothing'))).toEqual(s);
+    expect(applyEffect(s, eventDef('bike_broke')).state.cash).toBe(CONFIG.START_CASH - 2000);
+    expect(applyEffect(s, eventDef('sick')).state).toMatchObject({ sanity: 70, workBlockedUntilDay: 2 });
+    expect(applyEffect(s, eventDef('insider_tip')).state.insiderTipDay).toBe(2);
+    expect(applyEffect(s, eventDef('rent_hike')).state.expenseMultiplier).toBeCloseTo(1.1);
+    expect(applyEffect(s, eventDef('nothing')).state).toEqual(s);
   });
 
   it('sick blocks work tomorrow only, rent hike shows up in tomorrow expense', () => {
     let s = newRun();
-    s = applyEvent(s, eventDef('sick'));
-    s = applyEvent(s, eventDef('rent_hike'));
-    s = { ...s, phase: 'NIGHT', night: { step: 'EVENT', event: 'sick' } };
+    s = applyEffect(s, eventDef('sick')).state;
+    s = applyEffect(s, eventDef('rent_hike')).state;
+    s = { ...s, phase: 'NIGHT', night: { step: 'EVENT', event: 'sick', resultText: null } };
     s = reduce(s, { type: 'NIGHT_ACK_EVENT' });
     s = reduce(s, { type: 'NEXT_DAY' });
     expect(s.day).toBe(2);
     expect(s.dailyExpense).toBe(Math.round(CONFIG.BASE_EXPENSE * (1 + CONFIG.EXPENSE_GROWTH) * 1.1));
+
     const blocked = reduce(s, { type: 'WORK' });
     expect(blocked).toBe(s);
     expect(reduce(s, { type: 'REST' }).todayAction).toBe('REST');
@@ -213,9 +220,9 @@ describe('events', () => {
   it('a cash event can push cash negative before settlement, then the loan covers it', () => {
     let s = newRun();
     s = { ...s, cash: 500 };
-    s = applyEvent(s, eventDef('bike_broke'));
+    s = applyEffect(s, eventDef('bike_broke')).state;
     expect(s.cash).toBe(-1500);
-    s = { ...s, phase: 'NIGHT', night: { step: 'EVENT', event: 'bike_broke' } };
+    s = { ...s, phase: 'NIGHT', night: { step: 'EVENT', event: 'bike_broke', resultText: null } };
     s = reduce(s, { type: 'NIGHT_ACK_EVENT' });
     expect(s.night).toMatchObject({ step: 'SETTLE', autoLoan: 2500, outcome: 'CONTINUE' });
     expect(s.cash).toBe(0);
@@ -316,7 +323,7 @@ describe('baccarat venue', () => {
     const net = s.venueNetToday;
     s = reduce(s, { type: 'LEAVE_VENUE' });
     s = reduce(s, { type: 'END_DAY' });
-    if (s.night?.step === 'EVENT') s = reduce(s, { type: 'NIGHT_ACK_EVENT' });
+    s = passEvent(s);
     expect(s.history[0]).toMatchObject({ action: 'GAMBLE', venueNet: net });
     s = reduce(s, { type: 'NEXT_DAY' });
     expect(s.venueNetToday).toBe(0);
@@ -721,7 +728,7 @@ describe('stocks', () => {
     s = reduce(s, { type: 'STOCK_BUY', slot: 0, amount: 8000 });
     s = { ...s, cash: 100, rngState: 0 };
     s = reduce(s, { type: 'END_DAY' });
-    if (s.night?.step === 'EVENT') s = reduce(s, { type: 'NIGHT_ACK_EVENT' });
+    s = passEvent(s);
     expect(s.night?.step).toBe('LIQUIDATE');
     if (s.night?.step !== 'LIQUIDATE') return;
     expect(s.night.shortfall).toBeGreaterThan(0);
@@ -746,7 +753,7 @@ describe('stocks', () => {
     s = reduce(s, { type: 'STOCK_BUY', slot: 0, amount: 8000 });
     s = { ...s, cash: 100, rngState: 0 };
     s = reduce(s, { type: 'END_DAY' });
-    if (s.night?.step === 'EVENT') s = reduce(s, { type: 'NIGHT_ACK_EVENT' });
+    s = passEvent(s);
     s = reduce(s, { type: 'NIGHT_SKIP_LIQUIDATE' });
     expect(s.night?.step).toBe('SETTLE');
     if (s.night?.step !== 'SETTLE') return;
@@ -853,7 +860,7 @@ describe('nba', () => {
     expect(reduce(s, { type: 'EVENING_REVEAL' })).toBe(s);
     s = reduce(s, { type: 'EVENING_DONE' });
     expect(s.phase).toBe('NIGHT');
-    if (s.night?.step === 'EVENT') s = reduce(s, { type: 'NIGHT_ACK_EVENT' });
+    s = passEvent(s);
     if (s.night?.step === 'LIQUIDATE') s = reduce(s, { type: 'NIGHT_SKIP_LIQUIDATE' });
     s = reduce(s, { type: 'NEXT_DAY' });
     expect(s.nbaResults).toHaveLength(0);

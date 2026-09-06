@@ -7,12 +7,14 @@ import { formatMoney } from '../../engine/death';
 import { dailyBackground, newRunAction, todayKey, useGame } from '../../store';
 import type { BackgroundId } from '../../types';
 import { isSoundEnabled, setSoundEnabled } from '../sound';
+import { ACHIEVEMENTS, loadAchievements } from '../../analytics/achievements';
+import { AchievementsScreen } from './AchievementsScreen';
 import { DataScreen } from './DataScreen';
 import { LeaderboardScreen } from './LeaderboardScreen';
 
 export function TitleScreen() {
   const dispatch = useGame((s) => s.dispatch);
-  const [panel, setPanel] = useState<'none' | 'board' | 'data' | 'background'>('none');
+  const [panel, setPanel] = useState<'none' | 'board' | 'data' | 'background' | 'ach'>('none');
   const [taps, setTaps] = useState(0);
   const [sound, setSound] = useState(isSoundEnabled());
 
@@ -21,6 +23,7 @@ export function TitleScreen() {
 
   if (panel === 'board') return <LeaderboardScreen onClose={() => setPanel('none')} />;
   if (panel === 'data') return <DataScreen onClose={() => setPanel('none')} />;
+  if (panel === 'ach') return <AchievementsScreen onClose={() => setPanel('none')} />;
   if (panel === 'background') return <BackgroundPicker onPick={(bg) => dispatch(newRunAction('free', bg))} onClose={() => setPanel('none')} />;
 
   const onTitleTap = () => {
@@ -71,9 +74,14 @@ export function TitleScreen() {
           {key} · {dailyBg?.name ?? ''} · 全世界同一局
         </span>
       </button>
-      <button className="btn" onClick={() => setPanel('board')}>
-        排行榜
-      </button>
+      <div className="action-grid">
+        <button className="btn" onClick={() => setPanel('board')}>
+          排行榜
+        </button>
+        <button className="btn" onClick={() => setPanel('ach')}>
+          成就 {loadAchievements(browserStore()).length}/{ACHIEVEMENTS.length}
+        </button>
+      </div>
       <button className="chip title-chip" onClick={toggleSound}>
         音效 {sound ? '開' : '關'}
       </button>

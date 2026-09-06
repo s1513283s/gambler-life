@@ -13,9 +13,11 @@ import {
   type VenueId,
   type VenueStats,
 } from '../types';
-import { cryptoClose, cryptoNewSegment, cryptoOpen, cryptoTick } from './cryptoReducer';
-import { backgroundDef, clampSanity, expenseForDay, loanRoom, netWorth, nightlyInterest, wageFor, workSanityCostFor } from './economy';
-import { applyEvent, rollEvent } from './events';
+import { cryptoClose, cryptoMeme, cryptoNewSegment, cryptoOpen, cryptoTick } from './cryptoReducer';
+import { backgroundDef, clampSanity, expenseForDay, jobWage, loanRoom, netWorth, nightlyInterest } from './economy';
+import { breakPromiseIfAny, chooseEvent, eventDef, pickEvent, triggerEvent } from './events';
+import { makeNews } from './news';
+import { checkObsession, drawObsession } from './obsessions';
 import { acceptManage, buyItem, buyPresale, collectLend, lend, richNight, sellPresale } from './richReducer';
 import { eveningReveal, nbaBet, nbaLoadDay } from './nbaReducer';
 import { stockBuy, stockNightlyClose, stockOpenMarket, stockSell } from './stockReducer';
@@ -46,6 +48,10 @@ import { withPeak } from './venueShared';
 const ALLOWED: Record<GameActionType, readonly Phase[]> = {
   NEW_RUN: ['TITLE', 'DEATH', 'RETIRED'],
   ACK_UNLOCK: ['ACTION', 'VENUE', 'NIGHT'],
+  CRYPTO_MEME: ['VENUE'],
+  NIGHT_CHOOSE: ['NIGHT'],
+  FLEE: ['ACTION'],
+  SOBER: ['NIGHT'],
   BUY_ITEM: ['ACTION'],
   LEND: ['ACTION'],
   COLLECT_LEND: ['ACTION'],
@@ -112,6 +118,13 @@ function emptyStats(startNetWorth: number): RunStats {
     parlaysWon: 0,
     bjDecisions: 0,
     bjMistakes: 0,
+    liquidations: 0,
+    scratchJackpots: 0,
+    maxParlayLegsWon: 0,
+    maxWinStreak: 0,
+    memeMoons: 0,
+    memeRugs: 0,
+    venuesVisited: [],
     byVenue,
   };
 }
@@ -126,6 +139,7 @@ export interface RunSetup {
 
 export function createRun(setup: RunSetup, phase: Phase): GameState {
   const bg = backgroundDef(setup.background);
+  const drawn = drawObsession(setup.seed >>> 0, setup.background);
   const state: GameState = {
     saveVersion: CONFIG.SAVE_VERSION,
     runId: setup.runId,
@@ -133,7 +147,7 @@ export function createRun(setup: RunSetup, phase: Phase): GameState {
     mode: setup.mode,
     dailyKey: setup.dailyKey,
     background: setup.background,
-    rngState: setup.seed >>> 0,
+    rngState: drawn.rngState,
     day: 1,
     phase,
     cash: bg.startCash,
@@ -169,6 +183,14 @@ export function createRun(setup: RunSetup, phase: Phase): GameState {
     lends: [],
     managed: null,
     property: null,
+    relations: { family: 0, friend: 0, familyGone: false, friendGone: false },
+    scheduled: [],
+    promiseUntilDay: 0,
+    obsession: { id: drawn.id, done: false },
+    ending: null,
+    daysSinceGamble: 0,
+    venueStreak: 0,
+    lastJob: null,
     night: null,
     stats: emptyStats(bg.startCash - bg.startDebt),
     history: [],
@@ -200,10 +222,10 @@ function resolveTilt(state: GameState): Pick<GameState, 'tilt' | 'stats'> {
 /** END_DAY：股票收盤 -> 擲事件並套用效果。有事件就停在 EVENT 步等玩家確認，無事直接往下。 */
 function beginNight(state: GameState): GameState {
   const closed = stockNightlyClose(state);
-  const roll = rollEvent(closed.rngState, closed.todayAction === 'WORK');
-  const withEvent = applyEvent({ ...closed, rngState: roll.rngState }, roll.event);
-  if (roll.event.id === 'nothing') return afterEvent(withEvent);
-  return { ...withEvent, phase: 'NIGHT', night: { step: 'EVENT', event: roll.event.id } };
+  const pick = pickEvent(closed, closed.todayAction === 'WORK');
+  const triggered = triggerEvent({ ...closed, rngState: pick.rngState }, pick.event);
+  if (pick.event.id === 'nothing') return afterEvent(triggered.state);
+  return { ...triggered.state, phase: 'NIGHT', night: { step: 'EVENT', event: pick.event.id, resultText: triggered.text } };
 }
 
 /** 事件之後：付不出開銷且有持股就先問要不要砍倉，否則直接結算。 */
@@ -274,9 +296,13 @@ function settleNight(input: GameState): GameState {
     stats: { ...state.stats, loansTaken, totalBorrowed },
   });
 
+  const daysSinceGamble = state.todayAction === 'GAMBLE' ? 0 : state.daysSinceGamble + 1;
+  const news = makeNews(settled);
+
   let outcome: NightSettlement['outcome'] = 'CONTINUE';
   if (deathCause !== null) outcome = 'DEATH';
   else if (netWorth(settled) >= CONFIG.RETIRE_THRESHOLD) outcome = 'RETIRE_OFFER';
+  else if (daysSinceGamble >= CONFIG.SOBER_DAYS && state.day >= CONFIG.SOBER_MIN_DAY && netWorth(settled) > 0 && state.stats.daysGambled > 0) outcome = 'SOBER_OFFER';
 
   const log: DayLog = {
     day: state.day,
@@ -290,9 +316,13 @@ function settleNight(input: GameState): GameState {
 
   return withPeak({
     ...settled,
+    rngState: news.rngState,
+    daysSinceGamble,
     phase: 'NIGHT',
     night: {
       step: 'SETTLE',
+      news: news.text,
+      eventResultText: null,
       expense,
       autoLoan,
       interest,
@@ -321,6 +351,7 @@ function rollover(state: GameState): GameState {
       ...state,
       phase: 'DEATH',
       night: null,
+      ending: state.relations.familyGone ? 'ruined' : state.ending,
       stats: { ...state.stats, causeOfDeath: night.deathCause },
     };
   }
@@ -347,7 +378,7 @@ function rollover(state: GameState): GameState {
 export function reduce(state: GameState, action: GameAction): GameState {
   if (!ALLOWED[action.type].includes(state.phase)) return state;
   const next = reduceInner(state, action);
-  return next === state ? state : applyUnlocks(next);
+  return next === state ? state : checkObsession(applyUnlocks(next));
 }
 
 function reduceInner(state: GameState, action: GameAction): GameState {
@@ -360,14 +391,23 @@ function reduceInner(state: GameState, action: GameAction): GameState {
 
     case 'WORK': {
       if (!canWorkToday(state)) return state;
+      const job = action.job ?? 'day';
+      const pay = jobWage(state, job);
       return withPeak({
         ...state,
-        cash: state.cash + wageFor(state),
-        sanity: clampSanity(state.sanity - workSanityCostFor(state)),
+        rngState: pay.rngState,
+        cash: state.cash + pay.wage,
+        sanity: clampSanity(state.sanity - pay.sanityCost),
         actionUsedToday: true,
         todayAction: 'WORK',
+        lastJob: job,
         stats: { ...state.stats, daysWorked: state.stats.daysWorked + 1 },
       });
+    }
+
+    case 'FLEE': {
+      if (state.debt < CONFIG.LOAN_CAP * CONFIG.FLEE_DEBT_RATIO || state.cash < CONFIG.FLEE_COST) return state;
+      return { ...state, cash: state.cash - CONFIG.FLEE_COST, phase: 'RETIRED', ending: 'fled', venue: null, night: null };
     }
 
     case 'REST': {
@@ -416,8 +456,13 @@ function reduceInner(state: GameState, action: GameAction): GameState {
     case 'SELL_PRESALE':
       return sellPresale(state);
 
-    case 'ENTER_VENUE':
-      return enterVenue(state, action.venue);
+    case 'ENTER_VENUE': {
+      const entered = enterVenue(state, action.venue, action.vip === true);
+      return entered === state ? state : breakPromiseIfAny(entered);
+    }
+
+    case 'CRYPTO_MEME':
+      return cryptoMeme(state, action.stake);
 
     case 'BACCARAT_BET':
       return baccaratBet(state, action.side, action.stake);
@@ -486,8 +531,26 @@ function reduceInner(state: GameState, action: GameAction): GameState {
       if (state.phase === 'NIGHT' && state.night?.step !== 'LIQUIDATE') return state;
       return stockSell(state, action.slot, action.fraction);
 
-    case 'NIGHT_ACK_EVENT':
-      return state.night?.step === 'EVENT' ? afterEvent(state) : state;
+    case 'NIGHT_ACK_EVENT': {
+      if (state.night?.step !== 'EVENT') return state;
+      if (eventDef(state.night.event).choices && state.night.resultText === null) return state; // 選擇題要先用 NIGHT_CHOOSE
+      return afterEvent(state);
+    }
+
+    case 'NIGHT_CHOOSE': {
+      if (state.night?.step !== 'EVENT') return state;
+      const def = eventDef(state.night.event);
+      const applied = chooseEvent(state, def, action.index);
+      if (applied === null) return state;
+      // 分支有結果文字就停在同一步顯示，再按確認；否則直接往下
+      if (applied.text !== null) return { ...applied.state, night: { step: 'EVENT', event: def.id, resultText: applied.text } };
+      return afterEvent(applied.state);
+    }
+
+    case 'SOBER': {
+      if (state.night?.step !== 'SETTLE' || state.night.outcome !== 'SOBER_OFFER') return state;
+      return { ...state, phase: 'RETIRED', ending: 'sober', night: null };
+    }
 
     case 'NIGHT_SKIP_LIQUIDATE':
       return state.night?.step === 'LIQUIDATE' ? settleNight(state) : state;
@@ -513,7 +576,7 @@ function reduceInner(state: GameState, action: GameAction): GameState {
 
     case 'RETIRE': {
       if (state.night?.step !== 'SETTLE' || state.night.outcome !== 'RETIRE_OFFER') return state;
-      return { ...state, phase: 'RETIRED', night: null };
+      return { ...state, phase: 'RETIRED', ending: 'retired', night: null };
     }
 
     case 'BACK_TO_TITLE':

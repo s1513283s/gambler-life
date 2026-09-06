@@ -32,15 +32,16 @@ import { clampSanity } from './economy';
 import { applyRoundResult, recordWager, winLossSanity } from './venueShared';
 
 /** ENTER_VENUE：佔主行動，開新牌靴。 */
-export function enterVenue(state: GameState, kind: VenueKind): GameState {
+export function enterVenue(state: GameState, kind: VenueKind, vip = false): GameState {
   if (state.actionUsedToday || !isUnlocked(state, kind)) return state;
+  if (vip && (kind !== 'baccarat' || !isUnlocked(state, 'lending'))) return state;
 
   let rngState = state.rngState;
   let session: VenueSession;
   if (kind === 'baccarat') {
     const shoe = newShoe(CONFIG.BACCARAT_DECKS, rngState);
     rngState = shoe.rngState;
-    session = { kind, shoe: shoe.cards, cursor: 0, handsPlayed: 0, net: 0, pending: null, lastResult: null };
+    session = { kind, vip, road: [], shoe: shoe.cards, cursor: 0, handsPlayed: 0, net: 0, pending: null, lastResult: null };
   } else if (kind === 'blackjack') {
     const shoe = newShoe(CONFIG.BLACKJACK_DECKS, rngState);
     rngState = shoe.rngState;
@@ -63,6 +64,7 @@ export function enterVenue(state: GameState, kind: VenueKind): GameState {
 
   const byVenue = { ...state.stats.byVenue };
   byVenue[kind] = { ...byVenue[kind], sessions: byVenue[kind].sessions + 1 };
+  const visited = state.stats.venuesVisited.includes(kind) ? state.stats.venuesVisited : [...state.stats.venuesVisited, kind];
   return {
     ...state,
     phase: 'VENUE',
@@ -70,7 +72,8 @@ export function enterVenue(state: GameState, kind: VenueKind): GameState {
     actionUsedToday: true,
     todayAction: 'GAMBLE',
     venue: session,
-    stats: { ...state.stats, daysGambled: state.stats.daysGambled + 1, byVenue },
+    venueStreak: 0,
+    stats: { ...state.stats, daysGambled: state.stats.daysGambled + 1, byVenue, venuesVisited: visited },
   };
 }
 
@@ -113,6 +116,7 @@ export function baccaratBet(state: GameState, side: BaccaratSide, stake: number)
   const session = state.venue;
   if (session === null || session.kind !== 'baccarat' || session.pending !== null) return state;
   if (!isValidStake('baccarat', stake, state.cash, state.tilt)) return state;
+  if (session.vip && stake < Math.min(CONFIG.VIP_MIN_BET, state.cash)) return state;
 
   let shoe = session.shoe;
   let cursor = session.cursor;
@@ -125,7 +129,8 @@ export function baccaratBet(state: GameState, side: BaccaratSide, stake: number)
   }
 
   const dealt = dealHand(shoe, cursor);
-  const wagered = recordWager(state, 'baccarat', stake, stake * CONFIG.BACCARAT_EDGE[side]);
+  const edge = session.vip && side === 'banker' ? CONFIG.VIP_BANKER_EDGE : CONFIG.BACCARAT_EDGE[side];
+  const wagered = recordWager(state, 'baccarat', stake, stake * edge);
   return {
     ...wagered,
     rngState,
@@ -140,7 +145,7 @@ export function baccaratResolve(state: GameState): GameState {
   if (session === null || session.kind !== 'baccarat' || session.pending === null) return state;
 
   const pending = session.pending;
-  const payout = payoutFor(pending.side, pending.stake, pending.hand.outcome);
+  const payout = payoutFor(pending.side, pending.stake, pending.hand.outcome, session.vip ? CONFIG.VIP_COMMISSION : CONFIG.BACCARAT_COMMISSION);
   const net = payout - pending.stake;
   const next: BaccaratSession = {
     ...session,
@@ -148,6 +153,7 @@ export function baccaratResolve(state: GameState): GameState {
     net: session.net + net,
     pending: null,
     lastResult: { ...pending, payout },
+    road: [...session.road, pending.hand.outcome].slice(-CONFIG.BACCARAT_ROAD_LENGTH),
   };
   return applyRoundResult({ ...state, cash: state.cash + payout, venue: next }, 'baccarat', net, winLossSanity(net));
 }
@@ -341,5 +347,7 @@ export function scratchReveal(state: GameState): GameState {
     lastTicket: ticket,
   };
   const sanityDelta = net > 0 ? CONFIG.GAMBLE_WIN_SANITY : 0;
-  return applyRoundResult({ ...state, cash: state.cash + ticket.prize, venue: next }, 'scratch', net, sanityDelta);
+  const jackpot = ticketDef(ticket.price)?.jackpot === ticket.prize;
+  const stats = jackpot ? { ...state.stats, scratchJackpots: state.stats.scratchJackpots + 1 } : state.stats;
+  return applyRoundResult({ ...state, cash: state.cash + ticket.prize, venue: next, stats }, 'scratch', net, sanityDelta);
 }

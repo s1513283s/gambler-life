@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { browserStore, loadLeaderboard } from '../../analytics/runlog';
+import { addSharedEntry, browserStore, loadLeaderboard } from '../../analytics/runlog';
+import { decodeShare, shareToEntry } from '../../analytics/share';
 import { CONFIG } from '../../config';
 import { formatMoney } from '../../engine/death';
 import { todayKey } from '../../store';
@@ -12,6 +13,20 @@ type Tab = 'all' | 'peak' | 'daily';
 
 export function LeaderboardScreen({ onClose }: Props) {
   const [tab, setTab] = useState<Tab>('all');
+  const [code, setCode] = useState('');
+  const [msg, setMsg] = useState('');
+  const [version, setVersion] = useState(0);
+  const onImport = () => {
+    try {
+      const entry = shareToEntry(decodeShare(code), code);
+      const added = addSharedEntry(browserStore(), entry);
+      setMsg(added ? `加進來了：第 ${entry.days} 天` : '這個分享碼已經在榜上');
+      setCode('');
+      setVersion(version + 1);
+    } catch (err) {
+      setMsg(err instanceof Error ? err.message : String(err));
+    }
+  };
   const key = todayKey();
   const all = loadLeaderboard(browserStore());
   const entries =
@@ -44,12 +59,22 @@ export function LeaderboardScreen({ onClose }: Props) {
               {e.mode === 'daily' ? ` · ${e.dailyKey}` : ''}
             </span>
             <span className="muted small">
+              {e.shared ? '朋友 · ' : ''}
               {bgName(e.background)} · {e.cause}
             </span>
             <span className="small">峰值 ${formatMoney(e.peakNetWorth)}</span>
           </div>
         ))}
         <p className="muted small">Safari 會清掉七天沒開的網站資料，想保留請用標題畫面的匯出。</p>
+      </section>
+
+      <section className="card">
+        <h2>貼上朋友的分享碼</h2>
+        <input className="share-input" value={code} onChange={(e) => setCode(e.target.value)} placeholder="GL1.…" />
+        <button className="btn" disabled={code.trim().length === 0} onClick={onImport}>
+          加進排行榜
+        </button>
+        {msg && <p className="small ok">{msg}</p>}
       </section>
       <div className="spacer" />
       <button className="btn" onClick={onClose}>

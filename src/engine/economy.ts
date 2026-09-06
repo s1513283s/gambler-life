@@ -1,5 +1,6 @@
 import { CONFIG } from '../config';
-import type { BackgroundDef, GameState } from '../types';
+import type { BackgroundDef, GameState, JobId } from '../types';
+import { rngStep } from './rng';
 import { stockMarketValue } from '../venues/stocks';
 import { richPositionsValue } from './richReducer';
 
@@ -42,4 +43,26 @@ export function wageFor(state: Pick<GameState, 'background'>): number {
 
 export function workSanityCostFor(state: Pick<GameState, 'background'>): number {
   return backgroundDef(state.background).workSanityCost;
+}
+
+export interface JobPay {
+  wage: number;
+  sanityCost: number;
+  rngState: number;
+}
+
+/** 打工薪水：背景 wage 是日班基準，外送與夜班依比例縮放；外送在區間內隨機。 */
+export function jobWage(state: Pick<GameState, 'background' | 'rngState'>, job: JobId): JobPay {
+  const def = CONFIG.JOBS.find((j) => j.id === job) ?? CONFIG.JOBS[0];
+  const base = backgroundDef(state.background);
+  const scale = base.wage / CONFIG.WAGE;
+  let rngState = state.rngState;
+  let wage = def.wageMin;
+  if (def.wageMax > def.wageMin) {
+    const step = rngStep(rngState);
+    rngState = step.state;
+    wage = def.wageMin + Math.floor(step.value * (def.wageMax - def.wageMin + 1));
+  }
+  const sanityCost = job === 'day' ? base.workSanityCost : Math.round(def.sanityCost * (base.workSanityCost / CONFIG.WORK_SANITY_COST));
+  return { wage: Math.round(wage * scale), sanityCost, rngState };
 }

@@ -1,7 +1,7 @@
 import { CONFIG } from '../../config';
 import { DEATH_CAUSE_LABEL, formatMoney } from '../../engine/death';
 import { loanRoom } from '../../engine/economy';
-import { EVENT_TEXT } from '../../engine/events';
+import { eventDef } from '../../engine/events';
 import { liquidationValue } from '../../engine/stockReducer';
 import { useGame } from '../../store';
 import { AnimatedNumber } from '../components/AnimatedNumber';
@@ -25,24 +25,42 @@ export function NightScreen() {
   if (night === null) return null;
 
   if (night.step === 'EVENT') {
+    const def = eventDef(night.event);
+    const choosing = def.choices !== undefined && night.resultText === null;
     return (
       <main className="screen">
         <NightSky />
         <section className="card event-card pop-in">
           <h2>晚上</h2>
-          <p className="big">{EVENT_TEXT[night.event]}</p>
+          <p className="big">{def.text}</p>
+          {night.resultText !== null && <p className="event-result">{night.resultText}</p>}
         </section>
         <div className="spacer" />
-        <button className="btn btn-primary" onClick={() => dispatch({ type: 'NIGHT_ACK_EVENT' })}>
-          確認
-        </button>
+        {choosing ? (
+          <div className="choice-list">
+            {def.choices?.map((c, i) => (
+              <button
+                key={i}
+                className={`btn btn-choice ${(c.effects.cash ?? 0) < 0 && state.cash < -(c.effects.cash ?? 0) ? 'btn-choice-poor' : ''}`}
+                disabled={(c.effects.cash ?? 0) < 0 && state.cash < -(c.effects.cash ?? 0)}
+                onClick={() => dispatch({ type: 'NIGHT_CHOOSE', index: i })}
+              >
+                {c.label}
+              </button>
+            ))}
+          </div>
+        ) : (
+          <button className="btn btn-primary" onClick={() => dispatch({ type: 'NIGHT_ACK_EVENT' })}>
+            確認
+          </button>
+        )}
       </main>
     );
   }
 
   if (night.step === 'LIQUIDATE') {
     const covered = night.shortfall <= 0;
-    const canBorrow = loanRoom(state.debt) >= night.shortfall;
+    const canBorrow = !state.loanSharkGone && loanRoom(state.debt) >= night.shortfall;
     return (
       <main className="screen">
         <section className="card">
@@ -108,6 +126,12 @@ export function NightScreen() {
           <p className="danger big">{DEATH_CAUSE_LABEL[night.deathCause]}。</p>
         )}
         {night.outcome === 'RETIRE_OFFER' && <p className="ok big">你可以上岸了。</p>}
+        {night.outcome === 'SOBER_OFFER' && <p className="ok big">已經 {CONFIG.SOBER_DAYS} 天沒進場子了。你可以就此收手。</p>}
+      </section>
+
+      <section className="card news-card">
+        <span className="muted small">睡前滑到的</span>
+        <p className="news-line">{night.news}</p>
       </section>
 
       <div className="spacer" />
@@ -119,6 +143,15 @@ export function NightScreen() {
           </button>
           <button className="btn btn-big" onClick={() => dispatch({ type: 'NEXT_DAY' })}>
             繼續玩
+          </button>
+        </div>
+      ) : night.outcome === 'SOBER_OFFER' ? (
+        <div className="action-grid">
+          <button className="btn btn-big" onClick={() => dispatch({ type: 'SOBER' })}>
+            就此收手
+          </button>
+          <button className="btn btn-big" onClick={() => dispatch({ type: 'NEXT_DAY' })}>
+            再玩一天
           </button>
         </div>
       ) : (

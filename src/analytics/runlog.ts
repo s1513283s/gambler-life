@@ -3,7 +3,7 @@
  * 全部 try/catch：私密瀏覽或容量滿時遊戲照玩。
  */
 import { CONFIG } from '../config';
-import { DEATH_CAUSE_LABEL } from '../engine/death';
+import { DEATH_CAUSE_LABEL, ENDING_LABEL } from '../engine/death';
 import { netWorth } from '../engine/economy';
 import type { BackgroundId, DayLog, GameState, RunMode, RunStats } from '../types';
 
@@ -21,6 +21,7 @@ export interface LeaderboardEntry {
   cause: string; // 死因或「上岸」
   retired: boolean;
   endedAt: string; // ISO
+  shared?: boolean; // 朋友的分享碼
 }
 
 export interface RunRecord {
@@ -58,8 +59,18 @@ function writeJson(store: KeyValueStore, key: string, value: unknown): void {
 }
 
 export function causeLabel(state: GameState): string {
-  if (state.phase === 'RETIRED') return '上岸';
-  return state.stats.causeOfDeath ? DEATH_CAUSE_LABEL[state.stats.causeOfDeath] : '';
+  if (state.ending !== null && state.ending !== 'ruined') return ENDING_LABEL[state.ending];
+  if (state.phase === 'RETIRED') return ENDING_LABEL.retired;
+  const cause = state.stats.causeOfDeath ? DEATH_CAUSE_LABEL[state.stats.causeOfDeath] : '';
+  return state.ending === 'ruined' ? `${cause}，家破人亡` : cause;
+}
+
+/** 把朋友的分享碼加進排行榜；同一碼不重複 */
+export function addSharedEntry(store: KeyValueStore, entry: LeaderboardEntry): boolean {
+  const board = loadLeaderboard(store);
+  if (board.some((e) => e.runId === entry.runId)) return false;
+  writeJson(store, LEADERBOARD_KEY, rankEntries([...board, entry]));
+  return true;
 }
 
 export function toEntry(state: GameState, endedAt = new Date().toISOString()): LeaderboardEntry {
