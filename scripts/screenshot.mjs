@@ -11,7 +11,7 @@ import { join } from 'node:path';
 const CHROME = ['C:/Program Files/Google/Chrome/Application/chrome.exe', 'C:/Program Files (x86)/Google/Chrome/Application/chrome.exe'].find(existsSync);
 if (!CHROME) throw new Error('chrome not found');
 
-const [url, out, saveJson] = process.argv.slice(2);
+const [url, out, saveJson, clickText] = process.argv.slice(2);
 const port = 9222 + Math.floor(Math.random() * 500);
 const profile = join(tmpdir(), `gl-shot-${port}`);
 const chrome = spawn(CHROME, [
@@ -67,6 +67,10 @@ await sleep(1500);
 if (saveJson) {
   await send('Runtime.evaluate', { expression: `localStorage.setItem('gambler-life:save', ${JSON.stringify(saveJson)}); location.reload();` });
   await sleep(1800);
+}
+if (clickText) {
+  await send('Runtime.evaluate', { expression: `[...document.querySelectorAll('button')].find((b) => b.textContent.includes(${JSON.stringify(clickText)}))?.click()` });
+  await sleep(700);
 }
 await sleep(600);
 const shot = await send('Page.captureScreenshot', { format: 'png' });

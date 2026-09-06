@@ -1,5 +1,5 @@
 import { CONFIG } from '../config';
-import { VENUE_IDS, VENUE_TIER, type GameState, type VenueId } from '../types';
+import { VENUE_IDS, VENUE_TIER, type GameState, type Tier, type VenueId } from '../types';
 
 /** 開局就有的場子 */
 export function baseUnlocks(): VenueId[] {
@@ -7,8 +7,9 @@ export function baseUnlocks(): VenueId[] {
 }
 
 /** 目前資格夠到第幾層 */
-export function tierReached(state: GameState): 0 | 1 | 2 {
+export function tierReached(state: GameState): Tier {
   const s = state.stats;
+  if (s.peakNetWorth >= CONFIG.RICH_TIER_NET_WORTH) return 3;
   const undergroundLoss = -(s.byVenue.baccarat.net + s.byVenue.blackjack.net + s.byVenue.sicbo.net + s.byVenue.niuniu.net + s.byVenue.longmen.net);
   if (s.totalBorrowed >= CONFIG.UNLOCK_TIER2_BORROWED || undergroundLoss >= CONFIG.UNLOCK_TIER2_LOST) return 2;
   if (s.totalBorrowed > 0 || state.debt > 0) return 1;
@@ -35,11 +36,13 @@ export function isUnlocked(state: GameState, id: VenueId): boolean {
 }
 
 /** 解鎖對話：阿龍講的話 */
-export const UNLOCK_DIALOGUE: Record<1 | 2, { speaker: string; lines: string[] }> = {
+export const UNLOCK_DIALOGUE: Record<1 | 2 | 3, { speaker: string; lines: string[] }> = {
   1: { speaker: '阿龍', lines: ['錢先拿去。', '缺錢可以來我這邊玩兩把，樓下有桌子。'] },
   2: { speaker: '阿龍', lines: ['你這種人我看多了。', '後面那間，別讓條子看到。'] },
+  3: { speaker: '西裝男', lines: ['你這種手氣，不該只在樓下玩。', '做點正經的投資吧，我有幾個案子。'] },
 };
 
-export function unlockTierOf(ids: readonly VenueId[]): 1 | 2 {
+export function unlockTierOf(ids: readonly VenueId[]): 1 | 2 | 3 {
+  if (ids.some((id) => VENUE_TIER[id] === 3)) return 3;
   return ids.some((id) => VENUE_TIER[id] === 2) ? 2 : 1;
 }

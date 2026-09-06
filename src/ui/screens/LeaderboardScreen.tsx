@@ -8,13 +8,14 @@ interface Props {
   onClose: () => void;
 }
 
-type Tab = 'all' | 'daily';
+type Tab = 'all' | 'peak' | 'daily';
 
 export function LeaderboardScreen({ onClose }: Props) {
   const [tab, setTab] = useState<Tab>('all');
   const key = todayKey();
   const all = loadLeaderboard(browserStore());
-  const entries = tab === 'all' ? all : all.filter((e) => e.mode === 'daily' && e.dailyKey === key);
+  const entries =
+    tab === 'all' ? all : tab === 'peak' ? [...all].sort((a, b) => b.peakNetWorth - a.peakNetWorth) : all.filter((e) => e.mode === 'daily' && e.dailyKey === key);
   const bgName = (id: string) => CONFIG.BACKGROUNDS.find((b) => b.id === id)?.name ?? '';
 
   return (
@@ -24,7 +25,10 @@ export function LeaderboardScreen({ onClose }: Props) {
           <h2>本機排行榜</h2>
           <div className="mode-toggle">
             <button className={`chip ${tab === 'all' ? 'chip-active' : ''}`} onClick={() => setTab('all')}>
-              全部
+              天數
+            </button>
+            <button className={`chip ${tab === 'peak' ? 'chip-active' : ''}`} onClick={() => setTab('peak')}>
+              峰值
             </button>
             <button className={`chip ${tab === 'daily' ? 'chip-active' : ''}`} onClick={() => setTab('daily')}>
               今日挑戰

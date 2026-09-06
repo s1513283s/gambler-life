@@ -1,16 +1,19 @@
 import { CONFIG } from '../config';
 import type { BackgroundDef, GameState } from '../types';
 import { stockMarketValue } from '../venues/stocks';
+import { richPositionsValue } from './richReducer';
 
-/** dailyExpense(day) = BASE x (1 + GROWTH)^(day-1) x multiplier，取整數元 */
-export function expenseForDay(day: number, expenseMultiplier: number): number {
-  const grown = CONFIG.BASE_EXPENSE * Math.pow(1 + CONFIG.EXPENSE_GROWTH, day - 1);
+/** dailyExpense(day) = BASE x (1 + growth)^(day-1) x multiplier，取整數元。買房後 growth 變小。 */
+export function expenseForDay(day: number, expenseMultiplier: number, growth: number = CONFIG.EXPENSE_GROWTH): number {
+  const grown = CONFIG.BASE_EXPENSE * Math.pow(1 + growth, day - 1);
   return Math.round(grown * expenseMultiplier);
 }
 
-/** 淨值 = 現金 + 持股市值 - 債務。NBA 未結算注單不算資產。 */
-export function netWorth(state: Pick<GameState, 'cash' | 'debt' | 'stockMarket' | 'stockPositions' | 'stockDayIndex'>): number {
-  return state.cash + stockMarketValue(state) - state.debt;
+/** 淨值 = 現金 + 持股市值 + 放款與預售屋權益 - 債務 - 代操本金。NBA 未結算注單不算資產。 */
+export function netWorth(
+  state: Pick<GameState, 'cash' | 'debt' | 'stockMarket' | 'stockPositions' | 'stockDayIndex' | 'lends' | 'property' | 'managed'>,
+): number {
+  return state.cash + stockMarketValue(state) + richPositionsValue(state) - state.debt;
 }
 
 /** 可借額度。利息可能讓債務超過上限，故 clamp 到 0。 */

@@ -2123,3 +2123,47 @@ button {
   color: rgba(255, 255, 255, 0.6);
   font-weight: 800;
 }
+
+/* ---------- 花錢與有錢人的玩法 ---------- */
+
+.dock-four {
+  grid-template-columns: repeat(4, 1fr);
+}
+
+.dock-three {
+  grid-template-columns: repeat(3, 1fr);
+}
+
+.shop-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.shop-item {
+  padding: 10px 12px;
+}
+
+.shop-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+}
+
+.shop-name {
+  font-weight: 800;
+}
+
+.shop-owned {
+  opacity: 0.55;
+}
+
+.rich-card {
+  border-color: rgba(245, 197, 66, 0.35);
+}
+
+.bg-locked {
+  opacity: 0.45;
+  filter: grayscale(0.8);
+}

@@ -74,6 +74,21 @@ export function StatusBar({ state }: Props) {
             <Icon name="skull" size={12} /> 阿龍倒數 {Math.max(0, CONFIG.DEBT_DEADLINE_DAYS - state.daysMaxedOut)} 天
           </span>
         )}
+        {state.managed !== null && (
+          <span className="badge badge-gold">
+            <Icon name="cash" size={12} /> 金主 第 {state.managed.dueDay} 天到期
+          </span>
+        )}
+        {state.property !== null && (
+          <span className={`badge ${state.property.equity >= state.property.downPayment ? 'badge-info' : 'badge-danger'}`}>
+            <Icon name="stocks" size={12} /> 預售屋 ${formatMoney(state.property.equity)}
+          </span>
+        )}
+        {state.lends.length > 0 && (
+          <span className="badge badge-gold">
+            <Icon name="cash" size={12} /> 放款 ${formatMoney(state.lends.reduce((s, l) => s + l.principal, 0))}
+          </span>
+        )}
         {state.nbaBets.length > 0 && (
           <span className="badge badge-gold">
             <Icon name="nba" size={12} /> {state.nbaBets.length} 張待開

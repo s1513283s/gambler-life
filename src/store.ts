@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { markRetired } from './analytics/meta';
 import { browserStore, recordRun } from './analytics/runlog';
 import { CONFIG } from './config';
 import { assertInvariants } from './engine/invariants';
@@ -32,6 +33,7 @@ useGame.subscribe((store, prevStore) => {
   saveGame(next);
   if (FINISHED.includes(next.phase) && !FINISHED.includes(prev.phase) && next.runId === prev.runId) {
     recordRun(browserStore(), next);
+    if (next.phase === 'RETIRED') markRetired(browserStore());
   }
 });
 

@@ -87,6 +87,20 @@ export function NightScreen() {
         {night.interest > 0 && <p className="warn">利息滾了 ${formatMoney(night.interest)}。</p>}
         {night.harassed && <p className="danger">討債電話打來了，精神 -{CONFIG.HARASS_SANITY_COST}。</p>}
         {night.thug && <p className="danger">阿龍派人到門口了。明天不能打工，精神再 -{CONFIG.THUG_SANITY_COST}。</p>}
+        {night.lendInterest > 0 && <p className="ok">放出去的錢滾了 ${formatMoney(night.lendInterest)} 利息。</p>}
+        {night.lendDefaulted > 0 && <p className="danger">有人跑路了，${formatMoney(night.lendDefaulted)} 收不回來。</p>}
+        {night.propertyMarginCall && <p className="danger big">預售屋斷頭，頭期款沒了。</p>}
+        {!night.propertyMarginCall && night.propertyChange !== 0 && (
+          <p className={night.propertyChange > 0 ? 'ok' : 'danger'}>
+            預售屋權益 {night.propertyChange > 0 ? '+' : ''}
+            {formatMoney(night.propertyChange)}。
+          </p>
+        )}
+        {night.managedSettled !== null && night.outcome !== 'DEATH' && (
+          <p className="warn">
+            代操到期，賺了 ${formatMoney(night.managedSettled.profit)}，還了金主 ${formatMoney(night.managedSettled.paid)}。
+          </p>
+        )}
         {night.deadlineDaysLeft !== null && night.outcome !== 'DEATH' && (
           <p className="danger big">阿龍：「再給你 {night.deadlineDaysLeft} 天。」</p>
         )}

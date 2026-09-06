@@ -19,7 +19,10 @@ export type VenueId =
   | 'parlay'
   | 'sicbo'
   | 'niuniu'
-  | 'longmen';
+  | 'longmen'
+  | 'lending'
+  | 'managing'
+  | 'presale';
 
 export const VENUE_IDS: readonly VenueId[] = [
   'baccarat',
@@ -32,10 +35,15 @@ export const VENUE_IDS: readonly VenueId[] = [
   'sicbo',
   'niuniu',
   'longmen',
+  'lending',
+  'managing',
+  'presale',
 ];
 
-/** 解鎖層級（規格第 12 節）。tier 0 開局；tier 1 第一次借錢；tier 2 累計借款或地下場輸夠多。 */
-export const VENUE_TIER: Record<VenueId, 0 | 1 | 2> = {
+export type Tier = 0 | 1 | 2 | 3;
+
+/** 解鎖層級（規格第 12 節）。tier 0 開局；tier 1 第一次借錢；tier 2 累計借款或地下場輸夠多；tier 3 淨值峰值夠高。 */
+export const VENUE_TIER: Record<VenueId, Tier> = {
   scratch: 0,
   stocks: 0,
   crypto: 0,
@@ -46,9 +54,35 @@ export const VENUE_TIER: Record<VenueId, 0 | 1 | 2> = {
   sicbo: 2,
   niuniu: 2,
   longmen: 2,
+  lending: 3,
+  managing: 3,
+  presale: 3,
 };
 
-export type BackgroundId = 'normal' | 'rich' | 'broke' | 'engineer';
+export type PurchaseId = 'house' | 'buyout' | 'family' | 'party' | 'watch' | 'car';
+
+/** 放出去的高利貸，一筆一筆記 */
+export interface Lend {
+  principal: number; // 含滾進來的利息
+  startDay: number;
+}
+
+/** 代操：接了別人的錢，到期要還本金加分掉七成利潤 */
+export interface Managed {
+  principal: number;
+  cashAtStart: number; // 接錢前的現金，算利潤用
+  dueDay: number;
+}
+
+/** 預售屋：頭期款壓著，每晚權益隨機變動 */
+export interface Property {
+  downPayment: number;
+  equity: number;
+  startDay: number;
+  dueDay: number;
+}
+
+export type BackgroundId = 'normal' | 'rich' | 'broke' | 'engineer' | 'comeback';
 
 export interface BackgroundDef {
   id: BackgroundId;
@@ -67,7 +101,7 @@ export type RunMode = 'free' | 'daily';
 /** 今天的主行動。GAMBLE 代表進過場子。 */
 export type DayAction = 'WORK' | 'REST' | 'GAMBLE' | 'NONE';
 
-export type DeathCause = 'RENT' | 'SANITY' | 'LOAN_SHARK';
+export type DeathCause = 'RENT' | 'SANITY' | 'LOAN_SHARK' | 'CLIENT';
 
 export type NbaMarket = 'ml' | 'spread' | 'total';
 export type NbaSide = 'home' | 'away' | 'over' | 'under';
@@ -375,6 +409,11 @@ export interface NightSettlement {
   harassed: boolean; // 討債電話
   thug: boolean; // 派人到門口，明天不能打工
   deadlineDaysLeft: number | null; // 借滿時阿龍給的倒數，null = 沒借滿
+  lendInterest: number; // 高利貸今晚滾的利息
+  lendDefaulted: number; // 跑路損失的本金
+  propertyChange: number; // 預售屋權益變動
+  propertyMarginCall: boolean;
+  managedSettled: { profit: number; paid: number } | null; // 代操到期結算
   outcome: NightOutcome;
   deathCause: DeathCause | null;
 }
@@ -425,6 +464,12 @@ export interface GameState {
   unlockedVenues: VenueId[];
   pendingUnlock: VenueId[] | null; // 剛解鎖、等玩家看完對話
   daysMaxedOut: number; // 連續幾晚結算時債務仍在上限，阿龍倒數用
+  expenseGrowth: number; // 每日開銷成長率，買房後變小
+  loanSharkGone: boolean; // 買斷阿龍
+  purchases: PurchaseId[];
+  lends: Lend[];
+  managed: Managed | null;
+  property: Property | null;
   night: NightReport | null;
   stats: RunStats;
   history: DayLog[];
@@ -433,6 +478,12 @@ export interface GameState {
 export type GameAction =
   | { type: 'NEW_RUN'; seed: number; runId: string; mode: RunMode; dailyKey: string | null; background: BackgroundId }
   | { type: 'ACK_UNLOCK' } // 看完解鎖對話
+  | { type: 'BUY_ITEM'; item: PurchaseId } // 買房、買斷阿龍、給家裡錢、揮霍，各一次
+  | { type: 'LEND'; amount: number } // 放高利貸
+  | { type: 'COLLECT_LEND'; index: number } // 收回一筆
+  | { type: 'ACCEPT_MANAGE' } // 接代操
+  | { type: 'BUY_PRESALE'; amount: number } // 付頭期款
+  | { type: 'SELL_PRESALE' } // 提前賣掉
   | { type: 'WORK' }
   | { type: 'REST' }
   | { type: 'BORROW'; amount: number } // 不佔主行動

@@ -16,6 +16,7 @@ import {
 import { cryptoClose, cryptoNewSegment, cryptoOpen, cryptoTick } from './cryptoReducer';
 import { backgroundDef, clampSanity, expenseForDay, loanRoom, netWorth, nightlyInterest, wageFor, workSanityCostFor } from './economy';
 import { applyEvent, rollEvent } from './events';
+import { acceptManage, buyItem, buyPresale, collectLend, lend, richNight, sellPresale } from './richReducer';
 import { eveningReveal, nbaBet, nbaLoadDay } from './nbaReducer';
 import { stockBuy, stockNightlyClose, stockOpenMarket, stockSell } from './stockReducer';
 import {
@@ -45,6 +46,12 @@ import { withPeak } from './venueShared';
 const ALLOWED: Record<GameActionType, readonly Phase[]> = {
   NEW_RUN: ['TITLE', 'DEATH', 'RETIRED'],
   ACK_UNLOCK: ['ACTION', 'VENUE', 'NIGHT'],
+  BUY_ITEM: ['ACTION'],
+  LEND: ['ACTION'],
+  COLLECT_LEND: ['ACTION'],
+  ACCEPT_MANAGE: ['ACTION'],
+  BUY_PRESALE: ['ACTION'],
+  SELL_PRESALE: ['ACTION'],
   WORK: ['ACTION'],
   REST: ['ACTION'],
   BORROW: ['ACTION', 'VENUE'],
@@ -156,6 +163,12 @@ export function createRun(setup: RunSetup, phase: Phase): GameState {
     unlockedVenues: baseUnlocks(),
     pendingUnlock: null,
     daysMaxedOut: 0,
+    expenseGrowth: CONFIG.EXPENSE_GROWTH,
+    loanSharkGone: false,
+    purchases: [],
+    lends: [],
+    managed: null,
+    property: null,
     night: null,
     stats: emptyStats(bg.startCash - bg.startDebt),
     history: [],
@@ -206,7 +219,9 @@ function afterEvent(state: GameState): GameState {
  * 依規格第 3 節 NIGHT 順序結算：開銷 -> 自動借款 -> 利息 -> 討債 -> 派人 -> 倒數 -> 死亡 -> 上岸。
  * 阿龍的三段升級：欠超過討債線每晚扣精神；欠超過派人線明天不能打工；借滿連續幾晚就被帶走。
  */
-function settleNight(state: GameState): GameState {
+function settleNight(input: GameState): GameState {
+  const rich = richNight(input);
+  const state = rich.state;
   const expense = state.dailyExpense;
   let cash = state.cash - expense;
   let debt = state.debt;
@@ -218,7 +233,7 @@ function settleNight(state: GameState): GameState {
 
   if (cash < 0) {
     const shortfall = -cash;
-    if (loanRoom(debt) >= shortfall) {
+    if (!state.loanSharkGone && loanRoom(debt) >= shortfall) {
       autoLoan = shortfall;
       loansTaken += 1;
       totalBorrowed += shortfall;
@@ -231,10 +246,10 @@ function settleNight(state: GameState): GameState {
   const interest = nightlyInterest(debt);
   debt = debt + interest + autoLoan;
 
-  const harassed = debt > CONFIG.DEBT_HARASS_THRESHOLD;
+  const harassed = !state.loanSharkGone && debt > CONFIG.DEBT_HARASS_THRESHOLD;
   if (harassed) sanity = clampSanity(sanity - CONFIG.HARASS_SANITY_COST);
 
-  const thug = debt > CONFIG.DEBT_THUG_THRESHOLD;
+  const thug = !state.loanSharkGone && debt > CONFIG.DEBT_THUG_THRESHOLD;
   let workBlockedUntilDay = state.workBlockedUntilDay;
   if (thug) {
     sanity = clampSanity(sanity - CONFIG.THUG_SANITY_COST);
@@ -245,6 +260,7 @@ function settleNight(state: GameState): GameState {
   const daysMaxedOut = maxedOut ? state.daysMaxedOut + 1 : 0;
   const deadlineDaysLeft = maxedOut ? Math.max(0, CONFIG.DEBT_DEADLINE_DAYS - daysMaxedOut) : null;
 
+  if (deathCause === null && rich.clientDeath) deathCause = 'CLIENT';
   if (deathCause === null && sanity <= 0) deathCause = 'SANITY';
   if (deathCause === null && maxedOut && daysMaxedOut >= CONFIG.DEBT_DEADLINE_DAYS) deathCause = 'LOAN_SHARK';
 
@@ -275,7 +291,22 @@ function settleNight(state: GameState): GameState {
   return withPeak({
     ...settled,
     phase: 'NIGHT',
-    night: { step: 'SETTLE', expense, autoLoan, interest, harassed, thug, deadlineDaysLeft, outcome, deathCause },
+    night: {
+      step: 'SETTLE',
+      expense,
+      autoLoan,
+      interest,
+      harassed,
+      thug,
+      deadlineDaysLeft,
+      lendInterest: rich.lendInterest,
+      lendDefaulted: rich.lendDefaulted,
+      propertyChange: rich.propertyChange,
+      propertyMarginCall: rich.propertyMarginCall,
+      managedSettled: rich.managedSettled,
+      outcome,
+      deathCause,
+    },
     history: [...state.history, log],
   });
 }
@@ -300,7 +331,7 @@ function rollover(state: GameState): GameState {
     ...resolveTilt(state),
     day,
     phase: 'ACTION',
-    dailyExpense: expenseForDay(day, state.expenseMultiplier),
+    dailyExpense: expenseForDay(day, state.expenseMultiplier, state.expenseGrowth),
     actionUsedToday: false,
     todayAction: 'NONE',
     venueNetToday: 0,
@@ -312,9 +343,14 @@ function rollover(state: GameState): GameState {
   };
 }
 
+/** 任何狀態變動後都重算解鎖，第三層靠淨值峰值，哪個 action 推上去的都算。 */
 export function reduce(state: GameState, action: GameAction): GameState {
   if (!ALLOWED[action.type].includes(state.phase)) return state;
+  const next = reduceInner(state, action);
+  return next === state ? state : applyUnlocks(next);
+}
 
+function reduceInner(state: GameState, action: GameAction): GameState {
   switch (action.type) {
     case 'NEW_RUN':
       return createRun(action, 'ACTION');
@@ -347,7 +383,7 @@ export function reduce(state: GameState, action: GameAction): GameState {
 
     case 'BORROW': {
       const amount = Math.min(Math.floor(action.amount), loanRoom(state.debt));
-      if (amount <= 0) return state;
+      if (amount <= 0 || state.loanSharkGone) return state;
       return applyUnlocks({
         ...state,
         cash: state.cash + amount,
@@ -361,6 +397,24 @@ export function reduce(state: GameState, action: GameAction): GameState {
       if (amount <= 0) return state;
       return withPeak({ ...state, cash: state.cash - amount, debt: state.debt - amount });
     }
+
+    case 'BUY_ITEM':
+      return buyItem(state, action.item);
+
+    case 'LEND':
+      return lend(state, action.amount);
+
+    case 'COLLECT_LEND':
+      return collectLend(state, action.index);
+
+    case 'ACCEPT_MANAGE':
+      return acceptManage(state);
+
+    case 'BUY_PRESALE':
+      return buyPresale(state, action.amount);
+
+    case 'SELL_PRESALE':
+      return sellPresale(state);
 
     case 'ENTER_VENUE':
       return enterVenue(state, action.venue);

@@ -11,6 +11,7 @@ import { Icon } from '../components/Icon';
 import { VENUE_CARDS } from '../venueCards';
 import { LoanSharkScreen } from './LoanSharkScreen';
 import { NbaScreen } from './NbaScreen';
+import { ShopScreen } from './ShopScreen';
 import { StocksScreen } from './StocksScreen';
 
 const ACTION_LABEL = { WORK: '打工', REST: '休息', GAMBLE: '去了場子', NONE: '' } as const;
@@ -20,9 +21,10 @@ const TIER_HINT: Record<1 | 2, string> = { 1: '先向阿龍借一次錢', 2: '�
 export function ActionScreen() {
   const state = useGame((s) => s.state);
   const dispatch = useGame((s) => s.dispatch);
-  const [panel, setPanel] = useState<'none' | 'loan' | 'stocks' | 'nba'>('none');
+  const [panel, setPanel] = useState<'none' | 'loan' | 'stocks' | 'nba' | 'shop'>('none');
 
   if (panel === 'loan') return <LoanSharkScreen onClose={() => setPanel('none')} />;
+  if (panel === 'shop') return <ShopScreen onClose={() => setPanel('none')} />;
   if (panel === 'stocks') return <StocksScreen onClose={() => setPanel('none')} />;
   if (panel === 'nba') return <NbaScreen onClose={() => setPanel('none')} />;
 
@@ -110,7 +112,7 @@ export function ActionScreen() {
 
       <div className="spacer" />
 
-      <nav className="dock">
+      <nav className={`dock ${state.loanSharkGone ? 'dock-three' : 'dock-four'}`}>
         <button className="dock-item" onClick={() => setPanel('nba')}>
           <Icon name="nba" size={22} />
           <span>NBA</span>
@@ -121,11 +123,18 @@ export function ActionScreen() {
           <span>股票</span>
           {stockValue > 0 && <span className="dock-sub">${formatMoney(stockValue)}</span>}
         </button>
-        <button className={`dock-item dock-danger ${state.debt > 0 ? 'dock-alert' : ''}`} onClick={() => setPanel('loan')}>
-          <Icon name="loan" size={22} />
-          <span>阿龍</span>
-          {state.debt > 0 && <span className="dock-sub">欠 ${formatMoney(state.debt)}</span>}
+        <button className="dock-item" onClick={() => setPanel('shop')}>
+          <Icon name="cash" size={22} />
+          <span>花錢</span>
+          {(state.lends.length > 0 || state.property !== null || state.managed !== null) && <span className="dock-sub">有部位</span>}
         </button>
+        {!state.loanSharkGone && (
+          <button className={`dock-item dock-danger ${state.debt > 0 ? 'dock-alert' : ''}`} onClick={() => setPanel('loan')}>
+            <Icon name="loan" size={22} />
+            <span>阿龍</span>
+            {state.debt > 0 && <span className="dock-sub">欠 ${formatMoney(state.debt)}</span>}
+          </button>
+        )}
       </nav>
 
       <button className="btn btn-primary btn-cta" onClick={() => dispatch({ type: 'END_DAY' })}>
@@ -138,7 +147,8 @@ export function ActionScreen() {
 function UnlockDialog({ ids, onAck }: { ids: readonly VenueKind[] | readonly string[]; onAck: () => void }) {
   const tier = unlockTierOf(ids as VenueKind[]);
   const dialogue = UNLOCK_DIALOGUE[tier];
-  const names = VENUE_CARDS.filter((c) => ids.includes(c.kind)).map((c) => c.name);
+  const richNames: Record<string, string> = { lending: '放高利貸', managing: '代操', presale: '炒預售屋' };
+  const names = [...VENUE_CARDS.filter((c) => ids.includes(c.kind)).map((c) => c.name), ...ids.filter((id) => id in richNames).map((id) => richNames[id])];
   return (
     <div className="modal-backdrop">
       <section className="card modal-card pop-in">

@@ -5,7 +5,7 @@ import type { EventDef } from './types';
  * 調平衡只改這裡，engine 與 ui 不得硬編數字。
  */
 export const CONFIG = {
-  SAVE_VERSION: 9,
+  SAVE_VERSION: 10,
 
   // 經濟
   START_CASH: 15000,
@@ -122,6 +122,7 @@ export const CONFIG = {
     { id: 'rich', name: '富二代', blurb: '起手五萬，但開銷是別人的兩倍。', startCash: 50000, startDebt: 0, wage: 800, workSanityCost: 15, expenseMultiplier: 2 },
     { id: 'broke', name: '月光族', blurb: '起手五千，已經欠阿龍一萬。', startCash: 5000, startDebt: 10000, wage: 800, workSanityCost: 15, expenseMultiplier: 1 },
     { id: 'engineer', name: '工程師', blurb: '日薪一千五，但打工很傷精神。', startCash: 15000, startDebt: 0, wage: 1500, workSanityCost: 25, expenseMultiplier: 1 },
+    { id: 'comeback', name: '退休又回來的人', blurb: '上岸過一次才解鎖。起手十萬，但開銷是三倍。', startCash: 100000, startDebt: 0, wage: 800, workSanityCost: 15, expenseMultiplier: 3 },
   ],
 
   // 解鎖制（規格第 12 節）
@@ -149,6 +150,32 @@ export const CONFIG = {
   LONGMEN_EDGE: 0.03, // 撞柱賠雙倍帶來的長期優勢
   LONGMEN_POST_MULTIPLIER: 2,
   LONGMEN_REVEAL_MS: 1200,
+
+  // 錢的用途：一次性消費
+  HOUSE_PRICE: 300000, // 買房：開銷成長減半
+  HOUSE_EXPENSE_GROWTH: 0.02,
+  BUYOUT_PRICE: 150000, // 買斷阿龍：從此不能借也不會被討
+  FAMILY_GIFT: 100000, // 給家裡錢：孝子結局標籤
+  FAMILY_SANITY: 20,
+  SHOP_ITEMS: [
+    { id: 'party', name: '包場開趴', price: 30000, sanity: 25 },
+    { id: 'watch', name: '勞力士', price: 50000, sanity: 30 },
+    { id: 'car', name: '保時捷', price: 200000, sanity: 40 },
+  ],
+
+  // 第三層：有錢人的玩法（淨值峰值達此值解鎖）
+  RICH_TIER_NET_WORTH: 300000,
+  LEND_MIN: 50000, // 放高利貸最低本金
+  LEND_RATE: 0.02, // 日息，複利滾進本金
+  LEND_DEFAULT_RATE: 0.01, // 每晚跑路機率；期望值約 +1% / 天，全遊戲唯一正 EV
+  MANAGE_PRINCIPAL: 500000, // 代操：接管的金額
+  MANAGE_DAYS: 10,
+  MANAGE_SHARE: 0.3, // 賺的分三成
+  PRESALE_MIN: 200000, // 預售屋頭期款最低
+  PRESALE_DAYS: 10,
+  PRESALE_MOVE_MIN: 0.03, // 每晚權益變動幅度
+  PRESALE_MOVE_MAX: 0.08,
+  PRESALE_MARGIN_CALL: 0.3, // 權益跌到頭期款的三成就斷頭
 
   // 排行榜與分析紀錄
   LEADERBOARD_SIZE: 10,

@@ -1,4 +1,6 @@
 import { useEffect, useState } from 'react';
+import { loadMeta } from '../../analytics/meta';
+import { browserStore } from '../../analytics/runlog';
 import { CONFIG } from '../../config';
 import { prefetchData } from '../../data/loaders';
 import { formatMoney } from '../../engine/death';
@@ -80,6 +82,7 @@ export function TitleScreen() {
 }
 
 function BackgroundPicker({ onPick, onClose }: { onPick: (bg: BackgroundId) => void; onClose: () => void }) {
+  const meta = loadMeta(browserStore());
   return (
     <main className="screen">
       <section className="card">
@@ -87,17 +90,22 @@ function BackgroundPicker({ onPick, onClose }: { onPick: (bg: BackgroundId) => v
         <p className="muted small">每個背景是一種不同的解法。</p>
       </section>
       <div className="bg-grid">
-        {CONFIG.BACKGROUNDS.map((b) => (
-          <button key={b.id} className={`bg-card bg-${b.id}`} onClick={() => onPick(b.id)}>
-            <span className="bg-name">{b.name}</span>
-            <span className="bg-blurb">{b.blurb}</span>
-            <span className="bg-stats">
-              ${formatMoney(b.startCash)}
-              {b.startDebt > 0 ? ` · 欠 $${formatMoney(b.startDebt)}` : ''} · 日薪 ${formatMoney(b.wage)}
-              {b.expenseMultiplier !== 1 ? ` · 開銷 ×${b.expenseMultiplier}` : ''}
-            </span>
-          </button>
-        ))}
+        {CONFIG.BACKGROUNDS.map((b) => {
+          const locked = b.id === 'comeback' && !meta.retiredOnce;
+          return (
+            <button key={b.id} className={`bg-card bg-${b.id} ${locked ? 'bg-locked' : ''}`} disabled={locked} onClick={() => onPick(b.id)}>
+              <span className="bg-name">{locked ? '???' : b.name}</span>
+              <span className="bg-blurb">{locked ? '上岸過一次才解鎖。' : b.blurb}</span>
+              {!locked && (
+                <span className="bg-stats">
+                  ${formatMoney(b.startCash)}
+                  {b.startDebt > 0 ? ` · 欠 $${formatMoney(b.startDebt)}` : ''} · 日薪 ${formatMoney(b.wage)}
+                  {b.expenseMultiplier !== 1 ? ` · 開銷 ×${b.expenseMultiplier}` : ''}
+                </span>
+              )}
+            </button>
+          );
+        })}
       </div>
       <div className="spacer" />
       <button className="btn" onClick={onClose}>

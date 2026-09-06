@@ -1,11 +1,13 @@
 import { CONFIG } from '../config';
 import type { DeathCause, GameState } from '../types';
 import { netWorth } from './economy';
+import { PURCHASES } from './richReducer';
 
 export const DEATH_CAUSE_LABEL: Record<DeathCause, string> = {
   RENT: '付不出房租',
   SANITY: '精神崩潰',
   LOAN_SHARK: '被阿龍帶走',
+  CLIENT: '賠光金主的錢',
 };
 
 export interface CardLine {
@@ -42,6 +44,9 @@ export function buildDeathCard(state: GameState): { title: string; lines: CardLi
     },
     { label: '向阿龍借款', value: `${s.loansTaken} 次` },
   ];
+  const bought = state.purchases.filter((p) => p !== 'family').map((p) => PURCHASES.find((d) => d.id === p)?.name ?? p);
+  if (bought.length > 0) lines.push({ label: '這輩子買過', value: bought.join('、') });
+  if (state.purchases.includes('family')) lines.push({ label: '稱號', value: '孝子' });
   if (s.parlaysPlaced > 0) {
     lines.push({ label: '串關張數 / 全中', value: `${s.parlaysPlaced} / ${s.parlaysWon}` });
   }
