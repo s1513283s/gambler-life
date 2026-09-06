@@ -5,12 +5,12 @@ import type { EventDef } from './types';
  * 調平衡只改這裡，engine 與 ui 不得硬編數字。
  */
 export const CONFIG = {
-  SAVE_VERSION: 8,
+  SAVE_VERSION: 9,
 
   // 經濟
-  START_CASH: 30000,
+  START_CASH: 15000,
   BASE_EXPENSE: 1000,
-  EXPENSE_GROWTH: 0.02, // 每日 +2%
+  EXPENSE_GROWTH: 0.04, // 每日 +4%，目標一局 15-25 天
   WAGE: 800,
 
   // 精神
@@ -27,11 +27,14 @@ export const CONFIG = {
   TILT_FORCED_HANDS: 3, // 上頭時進場至少玩 3 局才能走
 
   // 地下錢莊
-  LOAN_CAP: 50000,
+  LOAN_CAP: 25000,
   LOAN_DAILY_RATE: 0.03,
   LOAN_UNIT: 5000,
-  DEBT_HARASS_THRESHOLD: 30000,
+  DEBT_HARASS_THRESHOLD: 12000, // 討債電話
   HARASS_SANITY_COST: 10,
+  DEBT_THUG_THRESHOLD: 20000, // 派人到門口：明天不能打工，精神再扣
+  THUG_SANITY_COST: 5,
+  DEBT_DEADLINE_DAYS: 7, // 借滿連續幾晚沒降到上限以下就被帶走
 
   // 上岸
   RETIRE_THRESHOLD: 1000000,
@@ -112,6 +115,40 @@ export const CONFIG = {
   NBA_REVEAL_MS: 2000, // 晚上逐張揭曉的間隔
 
   DAY_TARGET_SECONDS: 30,
+
+  // 開局背景：覆蓋起手數值
+  BACKGROUNDS: [
+    { id: 'normal', name: '一般人', blurb: '起手一萬五，日薪八百。', startCash: 15000, startDebt: 0, wage: 800, workSanityCost: 15, expenseMultiplier: 1 },
+    { id: 'rich', name: '富二代', blurb: '起手五萬，但開銷是別人的兩倍。', startCash: 50000, startDebt: 0, wage: 800, workSanityCost: 15, expenseMultiplier: 2 },
+    { id: 'broke', name: '月光族', blurb: '起手五千，已經欠阿龍一萬。', startCash: 5000, startDebt: 10000, wage: 800, workSanityCost: 15, expenseMultiplier: 1 },
+    { id: 'engineer', name: '工程師', blurb: '日薪一千五，但打工很傷精神。', startCash: 15000, startDebt: 0, wage: 1500, workSanityCost: 25, expenseMultiplier: 1 },
+  ],
+
+  // 解鎖制（規格第 12 節）
+  UNLOCK_TIER2_BORROWED: 20000, // 累計借款達此值解鎖地下場
+  UNLOCK_TIER2_LOST: 30000, // 或在百家樂 / 21 點累計輸超過此值
+
+  // 骰寶
+  SICBO_MIN_BET: 100,
+  SICBO_EDGE: { big: 0.0278, small: 0.0278, anyTriple: 0.306, triple: 0.162 },
+  SICBO_ANY_TRIPLE_PAYOUT: 24,
+  SICBO_TRIPLE_PAYOUT: 180,
+  SICBO_REVEAL_MS: 1400,
+
+  // 妞妞
+  NIUNIU_MIN_BET: 100,
+  NIUNIU_DECKS: 4,
+  NIUNIU_CUT_CARD: 30,
+  NIUNIU_EDGE: 0.03, // 平手歸莊造成的優勢，實測約 3%
+  NIUNIU_REVEAL_MS: 1600,
+
+  // 射龍門
+  LONGMEN_MIN_BET: 100,
+  LONGMEN_DECKS: 4,
+  LONGMEN_CUT_CARD: 20,
+  LONGMEN_EDGE: 0.03, // 撞柱賠雙倍帶來的長期優勢
+  LONGMEN_POST_MULTIPLIER: 2,
+  LONGMEN_REVEAL_MS: 1200,
 
   // 排行榜與分析紀錄
   LEADERBOARD_SIZE: 10,

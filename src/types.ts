@@ -2,7 +2,6 @@ import type { Candle, CryptoSegment, NbaGame, NbaGameDay, StockSegment } from '.
 
 export type Phase =
   | 'TITLE'
-  | 'MORNING'
   | 'ACTION'
   | 'VENUE'
   | 'EVENING'
@@ -17,7 +16,10 @@ export type VenueId =
   | 'stocks'
   | 'scratch'
   | 'nba'
-  | 'parlay';
+  | 'parlay'
+  | 'sicbo'
+  | 'niuniu'
+  | 'longmen';
 
 export const VENUE_IDS: readonly VenueId[] = [
   'baccarat',
@@ -27,12 +29,45 @@ export const VENUE_IDS: readonly VenueId[] = [
   'scratch',
   'nba',
   'parlay',
+  'sicbo',
+  'niuniu',
+  'longmen',
 ];
+
+/** 解鎖層級（規格第 12 節）。tier 0 開局；tier 1 第一次借錢；tier 2 累計借款或地下場輸夠多。 */
+export const VENUE_TIER: Record<VenueId, 0 | 1 | 2> = {
+  scratch: 0,
+  stocks: 0,
+  crypto: 0,
+  nba: 0,
+  parlay: 0,
+  baccarat: 1,
+  blackjack: 1,
+  sicbo: 2,
+  niuniu: 2,
+  longmen: 2,
+};
+
+export type BackgroundId = 'normal' | 'rich' | 'broke' | 'engineer';
+
+export interface BackgroundDef {
+  id: BackgroundId;
+  name: string;
+  blurb: string;
+  startCash: number;
+  startDebt: number;
+  wage: number;
+  workSanityCost: number;
+  expenseMultiplier: number;
+}
+
+/** free = 隨機 seed；daily = 日期 seed，全世界同一局 */
+export type RunMode = 'free' | 'daily';
 
 /** 今天的主行動。GAMBLE 代表進過場子。 */
 export type DayAction = 'WORK' | 'REST' | 'GAMBLE' | 'NONE';
 
-export type DeathCause = 'RENT' | 'SANITY';
+export type DeathCause = 'RENT' | 'SANITY' | 'LOAN_SHARK';
 
 export type NbaMarket = 'ml' | 'spread' | 'total';
 export type NbaSide = 'home' | 'away' | 'over' | 'under';
@@ -97,6 +132,9 @@ export interface RunStats {
   daysGambled: number;
   daysRested: number;
   loansTaken: number;
+  totalBorrowed: number; // 主動加自動借款的累計本金，解鎖用
+  biggestWinDay: number;
+  biggestLossDay: number;
   parlaysPlaced: number;
   parlaysWon: number;
   bjDecisions: number; // 21 點決策數
@@ -257,8 +295,74 @@ export interface CryptoSession {
   lastResult: CryptoRoundResult | null;
 }
 
+export type SicboBet = { kind: 'big' } | { kind: 'small' } | { kind: 'anyTriple' } | { kind: 'triple'; face: number };
+
+export interface SicboPending {
+  bet: SicboBet;
+  stake: number;
+  dice: [number, number, number];
+}
+
+export interface SicboResult extends SicboPending {
+  payout: number;
+}
+
+export interface SicboSession {
+  kind: 'sicbo';
+  handsPlayed: number;
+  net: number;
+  pending: SicboPending | null;
+  lastResult: SicboResult | null;
+}
+
+/** 妞妞一手：五張牌與牛值（0 = 無牛，1-9 = 牛幾，10 = 牛牛） */
+export interface NiuHand {
+  cards: Card[];
+  niu: number;
+}
+
+export interface NiuniuPending {
+  stake: number;
+  player: NiuHand;
+  banker: NiuHand;
+}
+
+export interface NiuniuResult extends NiuniuPending {
+  payout: number; // 退還總額；輸時 0，但輸的倍數可能超過本金（另外從現金扣）
+  multiplier: number; // 決定輸贏倍數的那一手
+  playerWins: boolean;
+}
+
+export interface NiuniuSession {
+  kind: 'niuniu';
+  shoe: Card[];
+  cursor: number;
+  handsPlayed: number;
+  net: number;
+  pending: NiuniuPending | null;
+  lastResult: NiuniuResult | null;
+}
+
+/** 射龍門：先發兩張門柱，玩家看牌下注，再開第三張 */
+export interface LongmenRound {
+  posts: [Card, Card];
+  stake: number | null; // null = 還沒下注
+  third: Card | null; // null = 還沒開
+  payout: number; // 開牌後才有意義
+  outcome: 'hit' | 'post' | 'miss' | null;
+}
+
+export interface LongmenSession {
+  kind: 'longmen';
+  shoe: Card[];
+  cursor: number;
+  handsPlayed: number;
+  net: number;
+  round: LongmenRound | null;
+}
+
 /** 場內進行中的狀態全部住在這裡，重整等於從同一狀態繼續。 */
-export type VenueSession = BaccaratSession | BlackjackSession | ScratchSession | CryptoSession;
+export type VenueSession = BaccaratSession | BlackjackSession | ScratchSession | CryptoSession | SicboSession | NiuniuSession | LongmenSession;
 export type VenueKind = VenueSession['kind'];
 
 export type NightOutcome = 'CONTINUE' | 'RETIRE_OFFER' | 'DEATH';
@@ -269,6 +373,8 @@ export interface NightSettlement {
   autoLoan: number; // 付不出開銷時自動向阿龍借的金額，0 表示沒借
   interest: number; // 今晚產生的利息
   harassed: boolean; // 討債電話
+  thug: boolean; // 派人到門口，明天不能打工
+  deadlineDaysLeft: number | null; // 借滿時阿龍給的倒數，null = 沒借滿
   outcome: NightOutcome;
   deathCause: DeathCause | null;
 }
@@ -286,6 +392,9 @@ export interface GameState {
   saveVersion: number;
   runId: string;
   seed: number;
+  mode: RunMode;
+  dailyKey: string | null; // daily 模式的日期，例如 2026-09-07
+  background: BackgroundId;
   rngState: number; // mulberry32 狀態，所有遊戲內亂數由此推進
   day: number; // 從 1 開始
   phase: Phase;
@@ -314,14 +423,16 @@ export interface GameState {
   stockPositions: StockPosition[];
   stockDayIndex: number; // 指向每支 closes 的今日收盤
   unlockedVenues: VenueId[];
+  pendingUnlock: VenueId[] | null; // 剛解鎖、等玩家看完對話
+  daysMaxedOut: number; // 連續幾晚結算時債務仍在上限，阿龍倒數用
   night: NightReport | null;
   stats: RunStats;
   history: DayLog[];
 }
 
 export type GameAction =
-  | { type: 'NEW_RUN'; seed: number; runId: string }
-  | { type: 'START_DAY' } // MORNING -> ACTION
+  | { type: 'NEW_RUN'; seed: number; runId: string; mode: RunMode; dailyKey: string | null; background: BackgroundId }
+  | { type: 'ACK_UNLOCK' } // 看完解鎖對話
   | { type: 'WORK' }
   | { type: 'REST' }
   | { type: 'BORROW'; amount: number } // 不佔主行動
@@ -338,6 +449,13 @@ export type GameAction =
   | { type: 'CRYPTO_OPEN'; direction: CryptoDirection; leverage: number; margin: number; takeProfitPct: number | null; stopLossPct: number | null }
   | { type: 'CRYPTO_TICK' } // 播下一根 K，檢查爆倉 / 停利停損 / 播完
   | { type: 'CRYPTO_CLOSE' } // 手動平倉
+  | { type: 'SICBO_BET'; bet: SicboBet; stake: number }
+  | { type: 'SICBO_RESOLVE' }
+  | { type: 'NIUNIU_BET'; stake: number }
+  | { type: 'NIUNIU_RESOLVE' }
+  | { type: 'LONGMEN_DEAL' } // 發兩張門柱
+  | { type: 'LONGMEN_BET'; stake: number } // 看牌後下注，同時開第三張
+  | { type: 'LONGMEN_RESOLVE' } // 派彩
   | { type: 'STOCK_OPEN_MARKET'; pool: readonly StockSegment[]; names: readonly string[] } // 建立五支假公司
   | { type: 'STOCK_BUY'; slot: number; amount: number } // 不佔主行動，精神 -3
   | { type: 'STOCK_SELL'; slot: number; fraction: 0.5 | 1 } // 不佔主行動，精神 -3，實現損益另計
@@ -349,7 +467,7 @@ export type GameAction =
   | { type: 'LEAVE_VENUE' } // VENUE -> ACTION
   | { type: 'END_DAY' } // ACTION -> NIGHT（擲事件；有事件停在 EVENT，否則直接 SETTLE）
   | { type: 'NIGHT_ACK_EVENT' } // NIGHT.EVENT -> NIGHT.SETTLE
-  | { type: 'NEXT_DAY' } // NIGHT.SETTLE -> MORNING 或 DEATH
+  | { type: 'NEXT_DAY' } // NIGHT.SETTLE -> ACTION 或 DEATH
   | { type: 'RETIRE' } // NIGHT.SETTLE（上岸提議）-> RETIRED
   | { type: 'BACK_TO_TITLE' };
 

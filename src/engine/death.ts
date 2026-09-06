@@ -1,9 +1,11 @@
+import { CONFIG } from '../config';
 import type { DeathCause, GameState } from '../types';
 import { netWorth } from './economy';
 
 export const DEATH_CAUSE_LABEL: Record<DeathCause, string> = {
   RENT: '付不出房租',
   SANITY: '精神崩潰',
+  LOAN_SHARK: '被阿龍帶走',
 };
 
 export interface CardLine {
@@ -21,11 +23,13 @@ export function buildDeathCard(state: GameState): { title: string; lines: CardLi
   const retired = state.phase === 'RETIRED';
   const cause = s.causeOfDeath ? DEATH_CAUSE_LABEL[s.causeOfDeath] : '';
 
+  const bg = CONFIG.BACKGROUNDS.find((b) => b.id === state.background);
   const lines: CardLine[] = [
     {
       label: retired ? '結局' : '死因',
       value: retired ? `上岸，淨值 ${formatMoney(netWorth(state))}` : cause,
     },
+    { label: '身分', value: `${bg?.name ?? ''}${state.mode === 'daily' ? ` · 每日挑戰 ${state.dailyKey ?? ''}` : ''}` },
     { label: '淨值最高', value: formatMoney(s.peakNetWorth) },
     { label: '總下注', value: formatMoney(s.totalWagered) },
     { label: '這輩子送給莊家的 EV', value: formatMoney(s.totalEvGiven) },

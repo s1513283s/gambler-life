@@ -2,7 +2,10 @@ import { useGame } from '../../store';
 import { BaccaratScreen } from './BaccaratScreen';
 import { BlackjackScreen } from './BlackjackScreen';
 import { CryptoScreen } from './CryptoScreen';
+import { LongmenScreen } from './LongmenScreen';
+import { NiuniuScreen } from './NiuniuScreen';
 import { ScratchScreen } from './ScratchScreen';
+import { SicboScreen } from './SicboScreen';
 
 /** 依 session.kind 分派到各場子畫面。之後每個新場子在這裡加一個 case。 */
 export function VenueScreen() {
@@ -17,5 +20,11 @@ export function VenueScreen() {
       return <ScratchScreen session={venue} />;
     case 'crypto':
       return <CryptoScreen session={venue} />;
+    case 'sicbo':
+      return <SicboScreen session={venue} />;
+    case 'niuniu':
+      return <NiuniuScreen session={venue} />;
+    case 'longmen':
+      return <LongmenScreen session={venue} />;
   }
 }

@@ -1,24 +1,47 @@
+import { useState } from 'react';
 import { browserStore, loadLeaderboard } from '../../analytics/runlog';
+import { CONFIG } from '../../config';
 import { formatMoney } from '../../engine/death';
+import { todayKey } from '../../store';
 
 interface Props {
   onClose: () => void;
 }
 
+type Tab = 'all' | 'daily';
+
 export function LeaderboardScreen({ onClose }: Props) {
-  const entries = loadLeaderboard(browserStore());
+  const [tab, setTab] = useState<Tab>('all');
+  const key = todayKey();
+  const all = loadLeaderboard(browserStore());
+  const entries = tab === 'all' ? all : all.filter((e) => e.mode === 'daily' && e.dailyKey === key);
+  const bgName = (id: string) => CONFIG.BACKGROUNDS.find((b) => b.id === id)?.name ?? '';
+
   return (
     <main className="screen">
       <section className="card">
-        <h2>本機排行榜</h2>
-        {entries.length === 0 && <p className="muted">還沒有紀錄。</p>}
+        <div className="hero-row">
+          <h2>本機排行榜</h2>
+          <div className="mode-toggle">
+            <button className={`chip ${tab === 'all' ? 'chip-active' : ''}`} onClick={() => setTab('all')}>
+              全部
+            </button>
+            <button className={`chip ${tab === 'daily' ? 'chip-active' : ''}`} onClick={() => setTab('daily')}>
+              今日挑戰
+            </button>
+          </div>
+        </div>
+        {entries.length === 0 && <p className="muted">{tab === 'daily' ? `${key} 還沒有人挑戰。` : '還沒有紀錄。'}</p>}
         {entries.map((e, i) => (
           <div key={e.runId} className="board-row">
             <span className="board-rank">{i + 1}</span>
             <span className="board-days">
               第 {e.days} 天{e.retired ? ' 上岸' : ''}
+              {e.mode === 'daily' ? ` · ${e.dailyKey}` : ''}
             </span>
-            <span className="muted small">{e.cause}</span>
+            <span className="muted small">
+              {bgName(e.background)} · {e.cause}
+            </span>
             <span className="small">峰值 ${formatMoney(e.peakNetWorth)}</span>
           </div>
         ))}

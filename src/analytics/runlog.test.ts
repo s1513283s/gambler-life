@@ -10,7 +10,7 @@ function memStore(): KeyValueStore {
 }
 
 function deadRun(runId: string, days: number, peak = 30000): GameState {
-  const s = reduce(createTitleState(), { type: 'NEW_RUN', seed: 1, runId });
+  const s = reduce(createTitleState(), { type: 'NEW_RUN', seed: 1, runId, mode: 'free', dailyKey: null, background: 'normal' });
   return { ...s, phase: 'DEATH', day: days, stats: { ...s.stats, peakNetWorth: peak, causeOfDeath: 'RENT' }, history: [] };
 }
 

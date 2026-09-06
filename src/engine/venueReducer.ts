@@ -26,12 +26,14 @@ import {
 import { newShoe } from '../venues/cards';
 import { rollPrize, scratchEdge, ticketDef } from '../venues/scratch';
 import { newCryptoSession } from './cryptoReducer';
+import { newLongmenSession, newNiuniuSession, newSicboSession } from './undergroundReducer';
+import { isUnlocked } from './unlocks';
 import { clampSanity } from './economy';
 import { applyRoundResult, recordWager, winLossSanity } from './venueShared';
 
 /** ENTER_VENUE：佔主行動，開新牌靴。 */
 export function enterVenue(state: GameState, kind: VenueKind): GameState {
-  if (state.actionUsedToday) return state;
+  if (state.actionUsedToday || !isUnlocked(state, kind)) return state;
 
   let rngState = state.rngState;
   let session: VenueSession;
@@ -45,8 +47,18 @@ export function enterVenue(state: GameState, kind: VenueKind): GameState {
     session = { kind, shoe: shoe.cards, cursor: 0, handsPlayed: 0, net: 0, round: null };
   } else if (kind === 'scratch') {
     session = { kind, handsPlayed: 0, net: 0, ticket: null, lastTicket: null };
-  } else {
+  } else if (kind === 'crypto') {
     session = newCryptoSession();
+  } else if (kind === 'sicbo') {
+    session = newSicboSession();
+  } else if (kind === 'niuniu') {
+    const built = newNiuniuSession(rngState);
+    session = built.session;
+    rngState = built.rngState;
+  } else {
+    const built = newLongmenSession(rngState);
+    session = built.session;
+    rngState = built.rngState;
   }
 
   const byVenue = { ...state.stats.byVenue };
@@ -79,6 +91,11 @@ function roundInProgress(session: VenueSession): boolean {
       return session.ticket !== null;
     case 'crypto':
       return session.position !== null;
+    case 'sicbo':
+    case 'niuniu':
+      return session.pending !== null;
+    case 'longmen':
+      return session.round !== null && session.round.stake !== null;
   }
 }
 

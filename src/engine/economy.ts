@@ -1,5 +1,5 @@
 import { CONFIG } from '../config';
-import type { GameState } from '../types';
+import type { BackgroundDef, GameState } from '../types';
 import { stockMarketValue } from '../venues/stocks';
 
 /** dailyExpense(day) = BASE x (1 + GROWTH)^(day-1) x multiplier，取整數元 */
@@ -25,4 +25,18 @@ export function nightlyInterest(debtBeforeLoan: number): number {
 
 export function clampSanity(value: number): number {
   return Math.min(CONFIG.SANITY_MAX, Math.max(0, Math.round(value)));
+}
+
+export function backgroundDef(id: GameState['background']): BackgroundDef {
+  const def = CONFIG.BACKGROUNDS.find((b) => b.id === id);
+  if (def === undefined) throw new Error(`unknown background ${id}`);
+  return def;
+}
+
+export function wageFor(state: Pick<GameState, 'background'>): number {
+  return backgroundDef(state.background).wage;
+}
+
+export function workSanityCostFor(state: Pick<GameState, 'background'>): number {
+  return backgroundDef(state.background).workSanityCost;
 }

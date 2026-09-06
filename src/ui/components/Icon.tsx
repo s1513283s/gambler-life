@@ -11,7 +11,11 @@ export type IconName =
   | 'skull'
   | 'warning'
   | 'cash'
-  | 'brain';
+  | 'brain'
+  | 'dice'
+  | 'niuniu'
+  | 'gate'
+  | 'lock';
 
 const PATHS: Record<IconName, string> = {
   work: 'M9 4h6a1 1 0 0 1 1 1v2h4a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V8a1 1 0 0 1 1-1h4V5a1 1 0 0 1 1-1zm1 3h4V6h-4v1zm-6 5h16v-3H4v3zm0 2v4h16v-4h-5v1H9v-1H4z',
@@ -27,6 +31,10 @@ const PATHS: Record<IconName, string> = {
   warning: 'M12 2L1 21h22L12 2zm0 6l6.5 11h-13L12 8zm-1 4v4h2v-4h-2zm0 5v2h2v-2h-2z',
   cash: 'M2 6h20v12H2V6zm2 2v8h16V8H4zm8 1a3 3 0 1 1 0 6 3 3 0 0 1 0-6zM5 9h2v2H5V9zm12 4h2v2h-2v-2z',
   brain: 'M9 3a3 3 0 0 0-3 3 3 3 0 0 0-2 5 3 3 0 0 0 1 5 3 3 0 0 0 4 3h2V3H9zm6 0a3 3 0 0 1 3 3 3 3 0 0 1 2 5 3 3 0 0 1-1 5 3 3 0 0 1-4 3h-2V3h2z',
+  dice: 'M5 3h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2zm0 2v14h14V5H5zm3 2a1.5 1.5 0 1 1 0 3 1.5 1.5 0 0 1 0-3zm8 0a1.5 1.5 0 1 1 0 3 1.5 1.5 0 0 1 0-3zm-4 4a1.5 1.5 0 1 1 0 3 1.5 1.5 0 0 1 0-3zm-4 4a1.5 1.5 0 1 1 0 3 1.5 1.5 0 0 1 0-3zm8 0a1.5 1.5 0 1 1 0 3 1.5 1.5 0 0 1 0-3z',
+  niuniu: 'M4 4c1 3 2.5 4.5 4 5h8c1.5-.5 3-2 4-5-3 1-4 2-5 3H9C8 6 7 5 4 4zm3 7h10l1 4-2 5H8l-2-5 1-4zm3 2a1 1 0 1 0 0 2 1 1 0 0 0 0-2zm4 0a1 1 0 1 0 0 2 1 1 0 0 0 0-2z',
+  gate: 'M4 3h4v18H4V3zm12 0h4v18h-4V3zM9 6h6v2H9V6zm-1 14a4 4 0 0 1 8 0h-8z',
+  lock: 'M12 2a5 5 0 0 0-5 5v3H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8a2 2 0 0 0-2-2h-1V7a5 5 0 0 0-5-5zm0 2a3 3 0 0 1 3 3v3H9V7a3 3 0 0 1 3-3zm0 9a2 2 0 0 1 1 3.7V19h-2v-2.3A2 2 0 0 1 12 13z',
 };
 
 interface Props {

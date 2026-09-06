@@ -1,21 +1,33 @@
 import { CONFIG } from '../config';
 import {
   VENUE_IDS,
+  type BackgroundId,
   type DayLog,
   type GameAction,
   type GameActionType,
   type GameState,
   type NightSettlement,
   type Phase,
+  type RunMode,
   type RunStats,
   type VenueId,
   type VenueStats,
 } from '../types';
-import { clampSanity, expenseForDay, loanRoom, netWorth, nightlyInterest } from './economy';
 import { cryptoClose, cryptoNewSegment, cryptoOpen, cryptoTick } from './cryptoReducer';
+import { backgroundDef, clampSanity, expenseForDay, loanRoom, netWorth, nightlyInterest, wageFor, workSanityCostFor } from './economy';
 import { applyEvent, rollEvent } from './events';
 import { eveningReveal, nbaBet, nbaLoadDay } from './nbaReducer';
 import { stockBuy, stockNightlyClose, stockOpenMarket, stockSell } from './stockReducer';
+import {
+  longmenBet,
+  longmenDeal,
+  longmenResolve,
+  niuniuBet,
+  niuniuResolve,
+  sicboBet,
+  sicboResolve,
+} from './undergroundReducer';
+import { applyUnlocks, baseUnlocks } from './unlocks';
 import {
   baccaratBet,
   baccaratResolve,
@@ -27,11 +39,12 @@ import {
   scratchBuy,
   scratchReveal,
 } from './venueReducer';
+import { withPeak } from './venueShared';
 
 /** 每個 action 允許出現的 phase。不在表內的組合一律忽略，這是重整與連點的第一道防線。 */
 const ALLOWED: Record<GameActionType, readonly Phase[]> = {
   NEW_RUN: ['TITLE', 'DEATH', 'RETIRED'],
-  START_DAY: ['MORNING'],
+  ACK_UNLOCK: ['ACTION', 'VENUE', 'NIGHT'],
   WORK: ['ACTION'],
   REST: ['ACTION'],
   BORROW: ['ACTION', 'VENUE'],
@@ -48,6 +61,13 @@ const ALLOWED: Record<GameActionType, readonly Phase[]> = {
   CRYPTO_OPEN: ['VENUE'],
   CRYPTO_TICK: ['VENUE'],
   CRYPTO_CLOSE: ['VENUE'],
+  SICBO_BET: ['VENUE'],
+  SICBO_RESOLVE: ['VENUE'],
+  NIUNIU_BET: ['VENUE'],
+  NIUNIU_RESOLVE: ['VENUE'],
+  LONGMEN_DEAL: ['VENUE'],
+  LONGMEN_BET: ['VENUE'],
+  LONGMEN_RESOLVE: ['VENUE'],
   STOCK_OPEN_MARKET: ['ACTION'],
   STOCK_BUY: ['ACTION'],
   STOCK_SELL: ['ACTION', 'NIGHT'],
@@ -64,20 +84,23 @@ const ALLOWED: Record<GameActionType, readonly Phase[]> = {
   BACK_TO_TITLE: ['DEATH', 'RETIRED'],
 };
 
-function emptyStats(): RunStats {
+function emptyStats(startNetWorth: number): RunStats {
   const byVenue = {} as Record<VenueId, VenueStats>;
   for (const id of VENUE_IDS) byVenue[id] = { wagered: 0, net: 0, sessions: 0 };
   return {
-    peakNetWorth: CONFIG.START_CASH,
+    peakNetWorth: startNetWorth,
     totalWagered: 0,
     totalEvGiven: 0,
     biggestWin: 0,
     biggestLoss: 0,
+    biggestWinDay: 0,
+    biggestLossDay: 0,
     tiltEpisodes: 0,
     daysWorked: 0,
     daysGambled: 0,
     daysRested: 0,
     loansTaken: 0,
+    totalBorrowed: 0,
     parlaysPlaced: 0,
     parlaysWon: 0,
     bjDecisions: 0,
@@ -86,20 +109,32 @@ function emptyStats(): RunStats {
   };
 }
 
-export function createRun(seed: number, runId: string, phase: Phase): GameState {
-  return {
+export interface RunSetup {
+  seed: number;
+  runId: string;
+  mode: RunMode;
+  dailyKey: string | null;
+  background: BackgroundId;
+}
+
+export function createRun(setup: RunSetup, phase: Phase): GameState {
+  const bg = backgroundDef(setup.background);
+  const state: GameState = {
     saveVersion: CONFIG.SAVE_VERSION,
-    runId,
-    seed,
-    rngState: seed >>> 0,
+    runId: setup.runId,
+    seed: setup.seed,
+    mode: setup.mode,
+    dailyKey: setup.dailyKey,
+    background: setup.background,
+    rngState: setup.seed >>> 0,
     day: 1,
     phase,
-    cash: CONFIG.START_CASH,
-    debt: 0,
+    cash: bg.startCash,
+    debt: bg.startDebt,
     sanity: CONFIG.SANITY_START,
     tilt: false,
-    dailyExpense: expenseForDay(1, 1),
-    expenseMultiplier: 1,
+    dailyExpense: expenseForDay(1, bg.expenseMultiplier),
+    expenseMultiplier: bg.expenseMultiplier,
     actionUsedToday: false,
     todayAction: 'NONE',
     workBlockedUntilDay: 0,
@@ -118,16 +153,20 @@ export function createRun(seed: number, runId: string, phase: Phase): GameState 
     stockMarket: null,
     stockPositions: [],
     stockDayIndex: 0,
-    unlockedVenues: [...VENUE_IDS],
+    unlockedVenues: baseUnlocks(),
+    pendingUnlock: null,
+    daysMaxedOut: 0,
     night: null,
-    stats: emptyStats(),
+    stats: emptyStats(bg.startCash - bg.startDebt),
     history: [],
   };
+  // 開局就欠錢的背景已經「認識阿龍」，直接開第一層，不播對話
+  return applyUnlocks(state, true);
 }
 
 /** 尚未開局的空狀態。 */
 export function createTitleState(): GameState {
-  return createRun(0, '', 'TITLE');
+  return createRun({ seed: 0, runId: '', mode: 'free', dailyKey: null, background: 'normal' }, 'TITLE');
 }
 
 export function canWorkToday(state: GameState): boolean {
@@ -143,12 +182,6 @@ function resolveTilt(state: GameState): Pick<GameState, 'tilt' | 'stats'> {
     return { tilt: false, stats: state.stats };
   }
   return { tilt: state.tilt, stats: state.stats };
-}
-
-function withPeak(state: GameState): GameState {
-  const worth = netWorth(state);
-  if (worth <= state.stats.peakNetWorth) return state;
-  return { ...state, stats: { ...state.stats, peakNetWorth: worth } };
 }
 
 /** END_DAY：股票收盤 -> 擲事件並套用效果。有事件就停在 EVENT 步等玩家確認，無事直接往下。 */
@@ -169,13 +202,17 @@ function afterEvent(state: GameState): GameState {
   return settleNight(state);
 }
 
-/** 依規格第 3 節 NIGHT 順序結算：開銷 -> 自動借款 -> 利息 -> 討債 -> 死亡 -> 上岸。 */
+/**
+ * 依規格第 3 節 NIGHT 順序結算：開銷 -> 自動借款 -> 利息 -> 討債 -> 派人 -> 倒數 -> 死亡 -> 上岸。
+ * 阿龍的三段升級：欠超過討債線每晚扣精神；欠超過派人線明天不能打工；借滿連續幾晚就被帶走。
+ */
 function settleNight(state: GameState): GameState {
   const expense = state.dailyExpense;
   let cash = state.cash - expense;
   let debt = state.debt;
   let sanity = state.sanity;
   let loansTaken = state.stats.loansTaken;
+  let totalBorrowed = state.stats.totalBorrowed;
   let autoLoan = 0;
   let deathCause: NightSettlement['deathCause'] = null;
 
@@ -184,6 +221,7 @@ function settleNight(state: GameState): GameState {
     if (loanRoom(debt) >= shortfall) {
       autoLoan = shortfall;
       loansTaken += 1;
+      totalBorrowed += shortfall;
       cash = 0;
     } else {
       deathCause = 'RENT';
@@ -196,15 +234,29 @@ function settleNight(state: GameState): GameState {
   const harassed = debt > CONFIG.DEBT_HARASS_THRESHOLD;
   if (harassed) sanity = clampSanity(sanity - CONFIG.HARASS_SANITY_COST);
 
-  if (deathCause === null && sanity <= 0) deathCause = 'SANITY';
+  const thug = debt > CONFIG.DEBT_THUG_THRESHOLD;
+  let workBlockedUntilDay = state.workBlockedUntilDay;
+  if (thug) {
+    sanity = clampSanity(sanity - CONFIG.THUG_SANITY_COST);
+    workBlockedUntilDay = Math.max(workBlockedUntilDay, state.day + 1);
+  }
 
-  const settled: GameState = {
+  const maxedOut = debt >= CONFIG.LOAN_CAP;
+  const daysMaxedOut = maxedOut ? state.daysMaxedOut + 1 : 0;
+  const deadlineDaysLeft = maxedOut ? Math.max(0, CONFIG.DEBT_DEADLINE_DAYS - daysMaxedOut) : null;
+
+  if (deathCause === null && sanity <= 0) deathCause = 'SANITY';
+  if (deathCause === null && maxedOut && daysMaxedOut >= CONFIG.DEBT_DEADLINE_DAYS) deathCause = 'LOAN_SHARK';
+
+  const settled: GameState = applyUnlocks({
     ...state,
     cash,
     debt,
     sanity,
-    stats: { ...state.stats, loansTaken },
-  };
+    workBlockedUntilDay,
+    daysMaxedOut,
+    stats: { ...state.stats, loansTaken, totalBorrowed },
+  });
 
   let outcome: NightSettlement['outcome'] = 'CONTINUE';
   if (deathCause !== null) outcome = 'DEATH';
@@ -223,12 +275,12 @@ function settleNight(state: GameState): GameState {
   return withPeak({
     ...settled,
     phase: 'NIGHT',
-    night: { step: 'SETTLE', expense, autoLoan, interest, harassed, outcome, deathCause },
+    night: { step: 'SETTLE', expense, autoLoan, interest, harassed, thug, deadlineDaysLeft, outcome, deathCause },
     history: [...state.history, log],
   });
 }
 
-/** NEXT_DAY：翻日，或依結算結果進 DEATH。 */
+/** NEXT_DAY：翻日直接進 ACTION，或依結算結果進 DEATH。 */
 function rollover(state: GameState): GameState {
   const night = state.night;
   if (night === null || night.step !== 'SETTLE') return state;
@@ -247,7 +299,7 @@ function rollover(state: GameState): GameState {
     ...state,
     ...resolveTilt(state),
     day,
-    phase: 'MORNING',
+    phase: 'ACTION',
     dailyExpense: expenseForDay(day, state.expenseMultiplier),
     actionUsedToday: false,
     todayAction: 'NONE',
@@ -265,17 +317,17 @@ export function reduce(state: GameState, action: GameAction): GameState {
 
   switch (action.type) {
     case 'NEW_RUN':
-      return createRun(action.seed, action.runId, 'MORNING');
+      return createRun(action, 'ACTION');
 
-    case 'START_DAY':
-      return { ...state, phase: 'ACTION' };
+    case 'ACK_UNLOCK':
+      return state.pendingUnlock === null ? state : { ...state, pendingUnlock: null };
 
     case 'WORK': {
       if (!canWorkToday(state)) return state;
       return withPeak({
         ...state,
-        cash: state.cash + CONFIG.WAGE,
-        sanity: clampSanity(state.sanity - CONFIG.WORK_SANITY_COST),
+        cash: state.cash + wageFor(state),
+        sanity: clampSanity(state.sanity - workSanityCostFor(state)),
         actionUsedToday: true,
         todayAction: 'WORK',
         stats: { ...state.stats, daysWorked: state.stats.daysWorked + 1 },
@@ -296,12 +348,12 @@ export function reduce(state: GameState, action: GameAction): GameState {
     case 'BORROW': {
       const amount = Math.min(Math.floor(action.amount), loanRoom(state.debt));
       if (amount <= 0) return state;
-      return {
+      return applyUnlocks({
         ...state,
         cash: state.cash + amount,
         debt: state.debt + amount,
-        stats: { ...state.stats, loansTaken: state.stats.loansTaken + 1 },
-      };
+        stats: { ...state.stats, loansTaken: state.stats.loansTaken + 1, totalBorrowed: state.stats.totalBorrowed + amount },
+      });
     }
 
     case 'REPAY': {
@@ -346,24 +398,29 @@ export function reduce(state: GameState, action: GameAction): GameState {
     case 'CRYPTO_CLOSE':
       return cryptoClose(state);
 
+    case 'SICBO_BET':
+      return sicboBet(state, action.bet, action.stake);
+
+    case 'SICBO_RESOLVE':
+      return sicboResolve(state);
+
+    case 'NIUNIU_BET':
+      return niuniuBet(state, action.stake);
+
+    case 'NIUNIU_RESOLVE':
+      return niuniuResolve(state);
+
+    case 'LONGMEN_DEAL':
+      return longmenDeal(state);
+
+    case 'LONGMEN_BET':
+      return longmenBet(state, action.stake);
+
+    case 'LONGMEN_RESOLVE':
+      return longmenResolve(state);
+
     case 'LEAVE_VENUE':
       return leaveVenue(state);
-
-    case 'END_DAY':
-      // 有待結算的 NBA 注單先進 EVENING 逐張揭曉，否則直接入夜
-      return state.nbaBets.length > 0 ? { ...state, phase: 'EVENING', nbaResults: [] } : beginNight(state);
-
-    case 'NBA_LOAD_DAY':
-      return nbaLoadDay(state, action.pool);
-
-    case 'NBA_BET':
-      return nbaBet(state, action.legs, action.stake);
-
-    case 'EVENING_REVEAL':
-      return eveningReveal(state);
-
-    case 'EVENING_DONE':
-      return state.nbaBets.length === 0 ? beginNight(state) : state;
 
     case 'STOCK_OPEN_MARKET':
       return stockOpenMarket(state, action.pool, action.names);
@@ -380,6 +437,22 @@ export function reduce(state: GameState, action: GameAction): GameState {
 
     case 'NIGHT_SKIP_LIQUIDATE':
       return state.night?.step === 'LIQUIDATE' ? settleNight(state) : state;
+
+    case 'END_DAY':
+      // 有待結算的 NBA 注單先進 EVENING 逐張揭曉，否則直接入夜
+      return state.nbaBets.length > 0 ? { ...state, phase: 'EVENING', nbaResults: [] } : beginNight(state);
+
+    case 'NBA_LOAD_DAY':
+      return nbaLoadDay(state, action.pool);
+
+    case 'NBA_BET':
+      return nbaBet(state, action.legs, action.stake);
+
+    case 'EVENING_REVEAL':
+      return eveningReveal(state);
+
+    case 'EVENING_DONE':
+      return state.nbaBets.length === 0 ? beginNight(state) : state;
 
     case 'NEXT_DAY':
       return rollover(state);

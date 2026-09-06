@@ -59,12 +59,19 @@ export function StatusBar({ state }: Props) {
       </div>
 
       <div className="hud-badges">
-        <span className={`badge ${state.debt > 0 ? 'badge-danger' : 'badge-dim'}`}>
-          <Icon name="loan" size={12} /> 欠阿龍 ${formatMoney(state.debt)}
-        </span>
+        {state.debt > 0 && (
+          <span className="badge badge-danger">
+            <Icon name="loan" size={12} /> 欠阿龍 ${formatMoney(state.debt)}
+          </span>
+        )}
         {stockValue > 0 && (
           <span className="badge badge-info">
             <Icon name="stocks" size={12} /> 持股 ${formatMoney(stockValue)}
+          </span>
+        )}
+        {state.daysMaxedOut > 0 && (
+          <span className="badge badge-danger badge-blink">
+            <Icon name="skull" size={12} /> 阿龍倒數 {Math.max(0, CONFIG.DEBT_DEADLINE_DAYS - state.daysMaxedOut)} 天
           </span>
         )}
         {state.nbaBets.length > 0 && (

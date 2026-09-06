@@ -1,6 +1,7 @@
 import { CONFIG } from '../config';
 import type { GameState, VenueId } from '../types';
 import { clampSanity, netWorth } from './economy';
+import { applyUnlocks } from './unlocks';
 
 export function withPeak(state: GameState): GameState {
   const worth = netWorth(state);
@@ -12,17 +13,22 @@ export function withPeak(state: GameState): GameState {
 export function applyRoundResult(state: GameState, kind: VenueId, net: number, sanityDelta: number): GameState {
   const byVenue = { ...state.stats.byVenue };
   byVenue[kind] = { ...byVenue[kind], net: byVenue[kind].net + net };
-  return withPeak({
-    ...state,
-    sanity: clampSanity(state.sanity + sanityDelta),
-    venueNetToday: state.venueNetToday + net,
-    stats: {
-      ...state.stats,
-      biggestWin: Math.max(state.stats.biggestWin, net),
-      biggestLoss: Math.min(state.stats.biggestLoss, net),
-      byVenue,
-    },
-  });
+  const s = state.stats;
+  return applyUnlocks(
+    withPeak({
+      ...state,
+      sanity: clampSanity(state.sanity + sanityDelta),
+      venueNetToday: state.venueNetToday + net,
+      stats: {
+        ...s,
+        biggestWin: Math.max(s.biggestWin, net),
+        biggestWinDay: net > s.biggestWin ? state.day : s.biggestWinDay,
+        biggestLoss: Math.min(s.biggestLoss, net),
+        biggestLossDay: net < s.biggestLoss ? state.day : s.biggestLossDay,
+        byVenue,
+      },
+    }),
+  );
 }
 
 export function recordWager(state: GameState, kind: VenueId, stake: number, ev: number): GameState {

@@ -1,4 +1,5 @@
 import { CONFIG } from '../config';
+import { loanRoom } from '../engine/economy';
 import type { Rng } from '../engine/rng';
 import type { BaccaratSide, BlackjackMove, BlackjackRound, CryptoDirection, GameAction, GameState, NbaLegPick, VenueKind } from '../types';
 import { canBetAt, minBetFor } from '../venues/betting';
@@ -16,9 +17,8 @@ type DayChooser = (state: GameState, rng: Rng) => GameAction;
 
 export function dailyPolicy(choose: DayChooser): Policy {
   return (state, rng) => {
+    if (state.pendingUnlock !== null) return { type: 'ACK_UNLOCK' };
     switch (state.phase) {
-      case 'MORNING':
-        return { type: 'START_DAY' };
       case 'ACTION':
       case 'VENUE':
         return choose(state, rng);
@@ -86,6 +86,10 @@ function gamblerDaily(plan: GamblerPlan): Policy {
     if (s.actionUsedToday) return END_DAY;
     if (s.sanity < CONFIG.TILT_THRESHOLD) return REST;
     if (!canBetAt(plan.venue, s.cash)) return main(s, WORK);
+    // 地下場要先認識阿龍：借一單位開門，借不到就打工
+    if (!s.unlockedVenues.includes(plan.venue)) {
+      return loanRoom(s.debt) >= CONFIG.LOAN_UNIT ? { type: 'BORROW', amount: CONFIG.LOAN_UNIT } : main(s, WORK);
+    }
     return { type: 'ENTER_VENUE', venue: plan.venue };
   });
 }

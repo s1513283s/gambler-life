@@ -22,7 +22,7 @@ export interface BatchOptions {
 /** 單局：同一顆 seed 同時餵給 NEW_RUN 與 policy 的 rng，整局可重播。 */
 export function simulateRun(policy: Policy, seed: number, maxDays: number): RunResult {
   const rng = createRng(seed);
-  let state: GameState = reduce(createTitleState(), { type: 'NEW_RUN', seed, runId: `sim-${seed}` });
+  let state: GameState = reduce(createTitleState(), { type: 'NEW_RUN', seed, runId: `sim-${seed}`, mode: 'free', dailyKey: null, background: 'normal' });
   let guard = 0;
 
   while (state.phase !== 'DEATH' && state.phase !== 'RETIRED' && state.day <= maxDays) {

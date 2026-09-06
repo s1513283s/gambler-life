@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { CONFIG } from '../config';
 import type { Candle, CryptoSegment, NbaGame, NbaGameDay, StockSegment } from '../data/schema';
-import type { EventDef, GameAction, GameState } from '../types';
+import { VENUE_IDS, type EventDef, type GameAction, type GameState } from '../types';
 import { buildDeathCard } from './death';
 import { applyEvent, rollEvent } from './events';
 import { createTitleState, reduce } from './reducer';
@@ -9,12 +9,11 @@ import { createTitleState, reduce } from './reducer';
 type Policy = (state: GameState) => 'WORK' | 'REST';
 
 function newRun(seed = 1): GameState {
-  return reduce(createTitleState(), { type: 'NEW_RUN', seed, runId: 'test' });
+  return reduce(createTitleState(), { type: 'NEW_RUN', seed, runId: 'test', mode: 'free', dailyKey: null, background: 'normal' });
 }
 
 /** 走完一整天：START_DAY -> 主行動 -> END_DAY -> (事件確認) -> NEXT_DAY */
 function playDay(s: GameState, action: GameAction): GameState {
-  s = reduce(s, { type: 'START_DAY' });
   s = reduce(s, action);
   s = reduce(s, { type: 'END_DAY' });
   if (s.night?.step === 'EVENT') s = reduce(s, { type: 'NIGHT_ACK_EVENT' });
@@ -36,13 +35,13 @@ function eventDef(id: EventDef['id']): EventDef {
 describe('phase guard', () => {
   it('ignores actions outside their phase', () => {
     const title = createTitleState();
-    const types = ['START_DAY', 'WORK', 'REST', 'END_DAY', 'NIGHT_ACK_EVENT', 'NEXT_DAY', 'RETIRE'] as const;
+    const types = ['WORK', 'REST', 'END_DAY', 'NIGHT_ACK_EVENT', 'NEXT_DAY', 'RETIRE'] as const;
     for (const type of types) expect(reduce(title, { type })).toBe(title);
     expect(reduce(title, { type: 'BORROW', amount: 5000 })).toBe(title);
   });
 
   it('allows only one main action per day', () => {
-    let s = reduce(newRun(), { type: 'START_DAY' });
+    let s = newRun();
     s = reduce(s, { type: 'WORK' });
     const cashAfterWork = s.cash;
     s = reduce(s, { type: 'WORK' });
@@ -52,7 +51,7 @@ describe('phase guard', () => {
   });
 
   it('NEXT_DAY is ignored while the event modal is open', () => {
-    let s = reduce(newRun(), { type: 'START_DAY' });
+    let s = newRun();
     s = { ...s, phase: 'NIGHT', night: { step: 'EVENT', event: 'sick' } };
     expect(reduce(s, { type: 'NEXT_DAY' })).toBe(s);
     expect(reduce(s, { type: 'NIGHT_ACK_EVENT' }).night?.step).toBe('SETTLE');
@@ -69,7 +68,7 @@ describe('economy', () => {
 
     const d = playDay({ ...s, rngState: 0 }, { type: 'END_DAY' });
     expect(d.day).toBe(2);
-    expect(d.dailyExpense).toBe(1020);
+    expect(d.dailyExpense).toBe(Math.round(CONFIG.BASE_EXPENSE * (1 + CONFIG.EXPENSE_GROWTH)));
   });
 
   it('working every day dies of sanity within a week', () => {
@@ -80,11 +79,11 @@ describe('economy', () => {
     }
   });
 
-  it('work-work-rest cycle survives into the 40s-60s', () => {
+  it('work-work-rest cycle lands near the 20-day target', () => {
     for (const seed of [1, 2, 3, 4, 5]) {
       const s = playUntilDeath((st) => (st.day % 3 === 0 ? 'REST' : 'WORK'), seed);
-      expect(s.day).toBeGreaterThanOrEqual(40);
-      expect(s.day).toBeLessThanOrEqual(65);
+      expect(s.day).toBeGreaterThanOrEqual(14);
+      expect(s.day).toBeLessThanOrEqual(32);
       expect(s.stats.loansTaken).toBeGreaterThan(0);
     }
   });
@@ -93,7 +92,6 @@ describe('economy', () => {
     let s = newRun();
     let sawLoan = false;
     while (s.phase !== 'DEATH') {
-      s = reduce(s, { type: 'START_DAY' });
       s = reduce(s, { type: s.day % 3 === 0 ? 'REST' : 'WORK' });
       s = reduce(s, { type: 'END_DAY' });
       if (s.night?.step === 'EVENT') s = reduce(s, { type: 'NIGHT_ACK_EVENT' });
@@ -116,7 +114,7 @@ describe('economy', () => {
 
 describe('loan shark', () => {
   it('borrows in units up to the cap and counts each loan', () => {
-    let s = reduce(newRun(), { type: 'START_DAY' });
+    let s = newRun();
     s = reduce(s, { type: 'BORROW', amount: CONFIG.LOAN_UNIT });
     expect(s.cash).toBe(CONFIG.START_CASH + CONFIG.LOAN_UNIT);
     expect(s.debt).toBe(CONFIG.LOAN_UNIT);
@@ -129,7 +127,7 @@ describe('loan shark', () => {
   });
 
   it('repays at most min(cash, debt) and charges interest on the remainder', () => {
-    let s = reduce(newRun(), { type: 'START_DAY' });
+    let s = newRun();
     s = reduce(s, { type: 'BORROW', amount: 10000 });
     s = reduce(s, { type: 'REPAY', amount: 4000 });
     expect(s.debt).toBe(6000);
@@ -143,12 +141,12 @@ describe('loan shark', () => {
   });
 
   it('does not let repaying dip below zero cash', () => {
-    let s = reduce(newRun(), { type: 'START_DAY' });
-    s = reduce(s, { type: 'BORROW', amount: 50000 });
+    let s = newRun();
+    s = reduce(s, { type: 'BORROW', amount: CONFIG.LOAN_CAP });
     s = { ...s, cash: 1000 };
-    s = reduce(s, { type: 'REPAY', amount: 50000 });
+    s = reduce(s, { type: 'REPAY', amount: CONFIG.LOAN_CAP });
     expect(s.cash).toBe(0);
-    expect(s.debt).toBe(49000);
+    expect(s.debt).toBe(CONFIG.LOAN_CAP - 1000);
   });
 });
 
@@ -196,27 +194,24 @@ describe('events', () => {
   });
 
   it('sick blocks work tomorrow only, rent hike shows up in tomorrow expense', () => {
-    let s = reduce(newRun(), { type: 'START_DAY' });
+    let s = newRun();
     s = applyEvent(s, eventDef('sick'));
     s = applyEvent(s, eventDef('rent_hike'));
     s = { ...s, phase: 'NIGHT', night: { step: 'EVENT', event: 'sick' } };
     s = reduce(s, { type: 'NIGHT_ACK_EVENT' });
     s = reduce(s, { type: 'NEXT_DAY' });
     expect(s.day).toBe(2);
-    expect(s.dailyExpense).toBe(Math.round(1020 * 1.1));
-
-    s = reduce(s, { type: 'START_DAY' });
+    expect(s.dailyExpense).toBe(Math.round(CONFIG.BASE_EXPENSE * (1 + CONFIG.EXPENSE_GROWTH) * 1.1));
     const blocked = reduce(s, { type: 'WORK' });
     expect(blocked).toBe(s);
     expect(reduce(s, { type: 'REST' }).todayAction).toBe('REST');
 
     s = playDay({ ...s, rngState: 0 }, { type: 'REST' });
-    s = reduce(s, { type: 'START_DAY' });
     expect(reduce(s, { type: 'WORK' }).todayAction).toBe('WORK');
   });
 
   it('a cash event can push cash negative before settlement, then the loan covers it', () => {
-    let s = reduce(newRun(), { type: 'START_DAY' });
+    let s = newRun();
     s = { ...s, cash: 500 };
     s = applyEvent(s, eventDef('bike_broke'));
     expect(s.cash).toBe(-1500);
@@ -230,7 +225,7 @@ describe('events', () => {
 
 describe('baccarat venue', () => {
   function enter(seed = 7): GameState {
-    let s = reduce(newRun(seed), { type: 'START_DAY' });
+    const s = { ...newRun(seed), unlockedVenues: [...VENUE_IDS] };
     return reduce(s, { type: 'ENTER_VENUE', venue: 'baccarat' });
   }
 
@@ -330,7 +325,7 @@ describe('baccarat venue', () => {
 
 describe('blackjack venue', () => {
   function enterBj(seed = 11): GameState {
-    const s = reduce(newRun(seed), { type: 'START_DAY' });
+    const s = { ...newRun(seed), unlockedVenues: [...VENUE_IDS] };
     return reduce(s, { type: 'ENTER_VENUE', venue: 'blackjack' });
   }
 
@@ -465,7 +460,7 @@ describe('blackjack venue', () => {
 
 describe('scratch venue', () => {
   function enterScratch(seed = 5): GameState {
-    const s = reduce(newRun(seed), { type: 'START_DAY' });
+    const s = newRun(seed);
     return reduce(s, { type: 'ENTER_VENUE', venue: 'scratch' });
   }
 
@@ -535,7 +530,7 @@ describe('crypto venue', () => {
   ];
 
   function enterCrypto(seed = 3): GameState {
-    const s = reduce(newRun(seed), { type: 'START_DAY' });
+    const s = newRun(seed);
     return reduce(s, { type: 'ENTER_VENUE', venue: 'crypto' });
   }
 
@@ -652,7 +647,7 @@ describe('stocks', () => {
   const names = Array.from({ length: 10 }, (_, i) => `公司${i}`);
 
   function withMarket(seed = 9): GameState {
-    const s = reduce(newRun(seed), { type: 'START_DAY' });
+    const s = newRun(seed);
     return reduce(s, { type: 'STOCK_OPEN_MARKET', pool, names });
   }
 
@@ -702,9 +697,9 @@ describe('stocks', () => {
 
   it('averages cost on repeat buys and sells half', () => {
     let s = rigSlot(withMarket(), 1, [...flat.slice(0, 21), 20000, ...flat.slice(22)]);
-    s = reduce(s, { type: 'STOCK_BUY', slot: 1, amount: 10000 }); // 100 元買約 99.86 股
+    s = reduce(s, { type: 'STOCK_BUY', slot: 1, amount: 4000 }); // 100 元買約 39.94 股
     s = { ...s, stockDayIndex: 21 }; // 漲到 200 元
-    s = reduce(s, { type: 'STOCK_BUY', slot: 1, amount: 10000 }); // 200 元買約 49.93 股
+    s = reduce(s, { type: 'STOCK_BUY', slot: 1, amount: 4000 }); // 200 元買約 19.97 股
     const pos = s.stockPositions[0];
     expect(pos.avgCost).toBeCloseTo(13333, -1);
     s = reduce(s, { type: 'STOCK_SELL', slot: 1, fraction: 0.5 });
@@ -723,7 +718,7 @@ describe('stocks', () => {
 
   it('asks to liquidate when short, lets you sell during NIGHT, then settles', () => {
     let s = rigSlot(withMarket(), 0, flat);
-    s = reduce(s, { type: 'STOCK_BUY', slot: 0, amount: 20000 });
+    s = reduce(s, { type: 'STOCK_BUY', slot: 0, amount: 8000 });
     s = { ...s, cash: 100, rngState: 0 };
     s = reduce(s, { type: 'END_DAY' });
     if (s.night?.step === 'EVENT') s = reduce(s, { type: 'NIGHT_ACK_EVENT' });
@@ -748,7 +743,7 @@ describe('stocks', () => {
 
   it('skipping liquidation falls back to the loan shark', () => {
     let s = rigSlot(withMarket(), 0, flat);
-    s = reduce(s, { type: 'STOCK_BUY', slot: 0, amount: 20000 });
+    s = reduce(s, { type: 'STOCK_BUY', slot: 0, amount: 8000 });
     s = { ...s, cash: 100, rngState: 0 };
     s = reduce(s, { type: 'END_DAY' });
     if (s.night?.step === 'EVENT') s = reduce(s, { type: 'NIGHT_ACK_EVENT' });
@@ -786,7 +781,7 @@ describe('nba', () => {
   ];
 
   function loaded(seed = 4): GameState {
-    let s = reduce(newRun(seed), { type: 'START_DAY' });
+    let s = newRun(seed);
     s = reduce(s, { type: 'NBA_LOAD_DAY', pool });
     if (s.nbaToday !== null && s.nbaToday.length === 0) {
       // 抽到無賽事日就強制指到第一個比賽日
@@ -881,7 +876,7 @@ describe('nba', () => {
   });
 
   it('insider tip marks one game on the tip day', () => {
-    let s = reduce(newRun(4), { type: 'START_DAY' });
+    let s = newRun(4);
     s = { ...s, insiderTipDay: 1, nbaDayOrder: [0], nbaDayIndex: 0 };
     s = reduce(s, { type: 'NBA_LOAD_DAY', pool });
     expect(s.insiderGameId).not.toBeNull();

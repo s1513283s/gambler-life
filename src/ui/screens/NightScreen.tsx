@@ -86,6 +86,10 @@ export function NightScreen() {
         )}
         {night.interest > 0 && <p className="warn">利息滾了 ${formatMoney(night.interest)}。</p>}
         {night.harassed && <p className="danger">討債電話打來了，精神 -{CONFIG.HARASS_SANITY_COST}。</p>}
+        {night.thug && <p className="danger">阿龍派人到門口了。明天不能打工，精神再 -{CONFIG.THUG_SANITY_COST}。</p>}
+        {night.deadlineDaysLeft !== null && night.outcome !== 'DEATH' && (
+          <p className="danger big">阿龍：「再給你 {night.deadlineDaysLeft} 天。」</p>
+        )}
         {night.outcome === 'DEATH' && night.deathCause !== null && (
           <p className="danger big">{DEATH_CAUSE_LABEL[night.deathCause]}。</p>
         )}

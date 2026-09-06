@@ -5,13 +5,16 @@
 import { CONFIG } from '../config';
 import { DEATH_CAUSE_LABEL } from '../engine/death';
 import { netWorth } from '../engine/economy';
-import type { DayLog, GameState, RunStats } from '../types';
+import type { BackgroundId, DayLog, GameState, RunMode, RunStats } from '../types';
 
 export const LEADERBOARD_KEY = 'gambler-life:leaderboard';
 export const RUNLOG_KEY = 'gambler-life:runs';
 
 export interface LeaderboardEntry {
   runId: string;
+  mode: RunMode;
+  dailyKey: string | null;
+  background: BackgroundId;
   days: number;
   peakNetWorth: number;
   finalNetWorth: number;
@@ -62,6 +65,9 @@ export function causeLabel(state: GameState): string {
 export function toEntry(state: GameState, endedAt = new Date().toISOString()): LeaderboardEntry {
   return {
     runId: state.runId,
+    mode: state.mode,
+    dailyKey: state.dailyKey,
+    background: state.background,
     days: state.day,
     peakNetWorth: state.stats.peakNetWorth,
     finalNetWorth: netWorth(state),
@@ -129,6 +135,9 @@ export function importRuns(store: KeyValueStore, json: string): number {
     .filter((r) => !boardKnown.has(r.runId))
     .map<LeaderboardEntry>((r) => ({
       runId: r.runId,
+      mode: 'free',
+      dailyKey: null,
+      background: 'normal',
       days: r.days,
       peakNetWorth: r.stats.peakNetWorth,
       finalNetWorth: 0,

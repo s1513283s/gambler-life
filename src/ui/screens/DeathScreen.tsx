@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { buildDeathCard } from '../../engine/death';
 import { newRunAction, useGame } from '../../store';
+import { NetWorthChart } from '../components/NetWorthChart';
 import { canShareFile, canvasToPng, renderDeathCard } from '../deathCard';
 
 type ShareState = 'idle' | 'shared' | 'unsupported' | 'failed';
@@ -51,10 +52,12 @@ export function DeathScreen() {
     }
   };
 
+  const retired = state.phase === 'RETIRED';
+
   return (
     <main className="screen">
       <section className="card death-card">
-        <div className={`stamp ${state.phase === 'RETIRED' ? 'stamp-ok' : ''}`}>{state.phase === 'RETIRED' ? '上岸' : '死亡'}</div>
+        <div className={`stamp ${retired ? 'stamp-ok' : ''}`}>{retired ? '上岸' : '死亡'}</div>
         <h2>{card.title}</h2>
         <dl>
           {card.lines.map((line, i) => (
@@ -64,6 +67,11 @@ export function DeathScreen() {
             </div>
           ))}
         </dl>
+      </section>
+
+      <section className="card">
+        <h2>這一局</h2>
+        <NetWorthChart history={state.history} biggestLossDay={state.stats.biggestLossDay} />
       </section>
 
       {showImage && previewUrl !== null && (
@@ -77,8 +85,8 @@ export function DeathScreen() {
       <button className="btn" disabled={previewUrl === null} onClick={() => void onShare()}>
         {share === 'shared' ? '已分享' : previewUrl === null ? '產生卡片中…' : '分享卡片'}
       </button>
-      <button className="btn btn-primary" onClick={() => dispatch(newRunAction())}>
-        再來一局
+      <button className="btn btn-primary" onClick={() => dispatch(newRunAction(state.mode, state.background))}>
+        {state.mode === 'daily' ? '再挑戰一次' : '再來一局'}
       </button>
       <button className="btn" onClick={() => dispatch({ type: 'BACK_TO_TITLE' })}>
         回標題

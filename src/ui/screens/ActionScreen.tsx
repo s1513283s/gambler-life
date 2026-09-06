@@ -1,60 +1,21 @@
 import { useState } from 'react';
 import { CONFIG } from '../../config';
 import { formatMoney } from '../../engine/death';
+import { wageFor, workSanityCostFor } from '../../engine/economy';
 import { canWorkToday } from '../../engine/reducer';
+import { UNLOCK_DIALOGUE, isUnlocked, unlockTierOf } from '../../engine/unlocks';
 import { useGame } from '../../store';
-import type { VenueKind } from '../../types';
+import { VENUE_TIER, type VenueKind } from '../../types';
 import { stockMarketValue } from '../../venues/stocks';
-import { Icon, type IconName } from '../components/Icon';
+import { Icon } from '../components/Icon';
+import { VENUE_CARDS } from '../venueCards';
 import { LoanSharkScreen } from './LoanSharkScreen';
 import { NbaScreen } from './NbaScreen';
 import { StocksScreen } from './StocksScreen';
 
 const ACTION_LABEL = { WORK: '打工', REST: '休息', GAMBLE: '去了場子', NONE: '' } as const;
 
-interface VenueCard {
-  kind: VenueKind;
-  icon: IconName;
-  name: string;
-  ev: string;
-  note: string;
-  accent: string; // CSS 顏色，卡片微光
-}
-
-const VENUES: VenueCard[] = [
-  {
-    kind: 'baccarat',
-    icon: 'baccarat',
-    name: '百家樂',
-    ev: `EV −${(CONFIG.BACCARAT_EDGE.banker * 100).toFixed(2)}%`,
-    note: '慢慢輸的那種',
-    accent: '#f5c542',
-  },
-  {
-    kind: 'blackjack',
-    icon: 'blackjack',
-    name: '21 點',
-    ev: `EV −${(CONFIG.BLACKJACK_BASE_EDGE * 100).toFixed(1)}% 起`,
-    note: '打錯一次多送 1%',
-    accent: '#e2c275',
-  },
-  {
-    kind: 'crypto',
-    icon: 'crypto',
-    name: '幣圈合約',
-    ev: `最高 ${CONFIG.CRYPTO_MAX_LEVERAGE}x`,
-    note: '手續費在等你',
-    accent: '#39ff9a',
-  },
-  {
-    kind: 'scratch',
-    icon: 'scratch',
-    name: '刮刮樂',
-    ev: `EV −${Math.round((1 - CONFIG.SCRATCH_RTP) * 100)}%`,
-    note: '幾乎沒輸的錯覺',
-    accent: '#ff3cac',
-  },
-];
+const TIER_HINT: Record<1 | 2, string> = { 1: '先向阿龍借一次錢', 2: '累計借款或在地下場輸夠多' };
 
 export function ActionScreen() {
   const state = useGame((s) => s.state);
@@ -68,18 +29,35 @@ export function ActionScreen() {
   const used = state.actionUsedToday;
   const sick = state.day <= state.workBlockedUntilDay;
   const stockValue = stockMarketValue(state);
+  const pending = state.pendingUnlock;
 
   return (
     <main className="screen">
+      {pending !== null && <UnlockDialog ids={pending} onAck={() => dispatch({ type: 'ACK_UNLOCK' })} />}
+
       <section className="card card-hero">
         <div className="hero-row">
-          <h2>今天做什麼</h2>
-          {used && <span className="badge badge-dim">已{ACTION_LABEL[state.todayAction]}</span>}
+          <h2>
+            第 <span className="day-number">{state.day}</span> 天
+          </h2>
+          {used ? <span className="badge badge-dim">已{ACTION_LABEL[state.todayAction]}</span> : <span className="badge badge-gold">今晚要付 ${formatMoney(state.dailyExpense)}</span>}
         </div>
+        {state.mode === 'daily' && <p className="muted small">今日挑戰 {state.dailyKey}</p>}
         {!used && <p className="muted small">選一個主行動。股票、NBA、阿龍隨時都能去。</p>}
         {sick && !used && (
           <p className="warn small">
             <Icon name="warning" size={12} /> 身體不舒服，今天不能打工。
+          </p>
+        )}
+        {state.insiderTipDay === state.day && <p className="ok small">朋友說今天 NBA 有一場內線。</p>}
+        {state.tilt && (
+          <p className="danger small shake">
+            <Icon name="warning" size={12} /> 你有點上頭。進場最低注是現金的 {Math.round(CONFIG.TILT_MIN_BET_RATIO * 100)}%，至少玩 {CONFIG.TILT_FORCED_HANDS} 局。
+          </p>
+        )}
+        {state.daysMaxedOut > 0 && (
+          <p className="danger small">
+            <Icon name="loan" size={12} /> 阿龍給你 {Math.max(0, CONFIG.DEBT_DEADLINE_DAYS - state.daysMaxedOut)} 天把錢降到上限以下。
           </p>
         )}
       </section>
@@ -89,7 +67,7 @@ export function ActionScreen() {
           <Icon name="work" size={28} />
           <span className="btn-title">打工</span>
           <span className="btn-sub">
-            +${formatMoney(CONFIG.WAGE)} · 精神 −{CONFIG.WORK_SANITY_COST}
+            +${formatMoney(wageFor(state))} · 精神 −{workSanityCostFor(state)}
           </span>
         </button>
         <button className="btn btn-big life-btn life-rest" disabled={used} onClick={() => dispatch({ type: 'REST' })}>
@@ -102,25 +80,31 @@ export function ActionScreen() {
       <section className="venue-section">
         <div className="section-head">
           <h2>場子</h2>
-          <span className="muted small">每個 EV 都是真的</span>
+          <span className="muted small">
+            {state.unlockedVenues.filter((v) => VENUE_CARDS.some((c) => c.kind === v)).length} / {VENUE_CARDS.length} 已解鎖
+          </span>
         </div>
         <div className="venue-grid">
-          {VENUES.map((v) => (
-            <button
-              key={v.kind}
-              className="venue-card"
-              style={{ '--accent': v.accent } as React.CSSProperties}
-              disabled={used}
-              onClick={() => dispatch({ type: 'ENTER_VENUE', venue: v.kind })}
-            >
-              <span className="venue-icon">
-                <Icon name={v.icon} size={26} />
-              </span>
-              <span className="venue-name">{v.name}</span>
-              <span className="venue-ev">{v.ev}</span>
-              <span className="venue-note">{v.note}</span>
-            </button>
-          ))}
+          {VENUE_CARDS.map((v) => {
+            const unlocked = isUnlocked(state, v.kind);
+            const tier = VENUE_TIER[v.kind];
+            return (
+              <button
+                key={v.kind}
+                className={`venue-card ${unlocked ? '' : 'venue-locked'}`}
+                style={{ '--accent': v.accent } as React.CSSProperties}
+                disabled={used || !unlocked}
+                onClick={() => dispatch({ type: 'ENTER_VENUE', venue: v.kind })}
+              >
+                <span className="venue-icon">
+                  <Icon name={unlocked ? v.icon : 'lock'} size={26} />
+                </span>
+                <span className="venue-name">{unlocked ? v.name : '???'}</span>
+                <span className="venue-ev">{unlocked ? v.ev : `第 ${tier} 層`}</span>
+                <span className="venue-note">{unlocked ? v.note : tier === 1 || tier === 2 ? TIER_HINT[tier] : ''}</span>
+              </button>
+            );
+          })}
         </div>
       </section>
 
@@ -148,5 +132,27 @@ export function ActionScreen() {
         結束今天
       </button>
     </main>
+  );
+}
+
+function UnlockDialog({ ids, onAck }: { ids: readonly VenueKind[] | readonly string[]; onAck: () => void }) {
+  const tier = unlockTierOf(ids as VenueKind[]);
+  const dialogue = UNLOCK_DIALOGUE[tier];
+  const names = VENUE_CARDS.filter((c) => ids.includes(c.kind)).map((c) => c.name);
+  return (
+    <div className="modal-backdrop">
+      <section className="card modal-card pop-in">
+        <p className="muted small">{dialogue.speaker}</p>
+        {dialogue.lines.map((line, i) => (
+          <p key={i} className="big dialogue-line" style={{ animationDelay: `${i * 500}ms` }}>
+            「{line}」
+          </p>
+        ))}
+        <p className="gold small">解鎖：{names.join('、')}</p>
+        <button className="btn btn-primary" onClick={onAck}>
+          知道了
+        </button>
+      </section>
+    </div>
   );
 }

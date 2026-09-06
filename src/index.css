@@ -1872,3 +1872,254 @@ button {
     transition-duration: 0.01ms !important;
   }
 }
+
+/* ---------- 解鎖對話、背景、倒數 ---------- */
+
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: rgba(0, 0, 0, 0.7);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+}
+
+.modal-card {
+  width: 100%;
+  max-width: 380px;
+  border-color: rgba(245, 197, 66, 0.5);
+  box-shadow: 0 0 40px rgba(245, 197, 66, 0.2);
+}
+
+.dialogue-line {
+  opacity: 0;
+  animation: screen-in 400ms ease-out forwards;
+}
+
+.venue-locked {
+  opacity: 0.45;
+  filter: grayscale(0.8);
+}
+
+.venue-locked .venue-icon {
+  color: var(--muted);
+  filter: none;
+}
+
+.venue-locked .venue-ev {
+  color: var(--muted);
+}
+
+.badge-blink {
+  animation: blink 1s steps(2) infinite;
+}
+
+.btn-daily {
+  min-height: 64px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  border-color: rgba(41, 211, 255, 0.5);
+  background: linear-gradient(180deg, rgba(41, 211, 255, 0.16), rgba(41, 211, 255, 0.04));
+}
+
+.btn-daily .btn-title {
+  font-size: 18px;
+  color: #bfeeff;
+}
+
+.bg-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 10px;
+}
+
+.bg-card {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  padding: 14px 16px;
+  text-align: left;
+  color: var(--text);
+  background: var(--glass);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  cursor: pointer;
+  transition: transform 90ms, border-color 150ms, box-shadow 150ms;
+}
+
+.bg-card:active {
+  transform: scale(0.98);
+}
+
+.bg-card:hover {
+  border-color: var(--line-strong);
+}
+
+.bg-name {
+  font-size: 18px;
+  font-weight: 800;
+}
+
+.bg-blurb {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.bg-stats {
+  font-family: var(--font-num);
+  font-size: 13px;
+  color: var(--gold);
+}
+
+.bg-rich {
+  border-color: rgba(245, 197, 66, 0.4);
+}
+
+.bg-broke {
+  border-color: rgba(255, 59, 92, 0.4);
+}
+
+.bg-engineer {
+  border-color: rgba(41, 211, 255, 0.4);
+}
+
+/* ---------- 淨值走勢 ---------- */
+
+.worth-chart svg {
+  width: 100%;
+  height: 120px;
+  display: block;
+}
+
+.worth-line {
+  stroke-dasharray: 1000;
+  stroke-dashoffset: 1000;
+  animation: draw-line 1.4s ease-out forwards;
+}
+
+@keyframes draw-line {
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+.worth-legend {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 6px;
+}
+
+/* ---------- 骰寶 ---------- */
+
+.sicbo-table {
+  background:
+    radial-gradient(ellipse at 50% 30%, rgba(120, 60, 20, 0.55), transparent 70%),
+    linear-gradient(180deg, #3b1d0c, #2a1408);
+  border-color: #6b3a1c;
+}
+
+.dice-row {
+  display: flex;
+  justify-content: center;
+  gap: 16px;
+  padding: 10px 0;
+}
+
+.die {
+  width: 56px;
+  height: 56px;
+  border-radius: 12px;
+  background: linear-gradient(180deg, #fff, #e5e5e5);
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  padding: 8px;
+  gap: 2px;
+  box-shadow: 0 6px 14px rgba(0, 0, 0, 0.5), inset 0 -2px 0 rgba(0, 0, 0, 0.15);
+}
+
+.pip {
+  border-radius: 50%;
+}
+
+.pip-on {
+  background: #111;
+}
+
+.die-rolling {
+  animation: die-roll 0.5s ease-in-out infinite;
+}
+
+@keyframes die-roll {
+  0%,
+  100% {
+    transform: rotate(-12deg) translateY(0);
+  }
+  50% {
+    transform: rotate(14deg) translateY(-10px);
+  }
+}
+
+.triple-picker {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  justify-content: center;
+}
+
+.triple-picker .chip {
+  min-height: 34px;
+  font-size: 12px;
+}
+
+.result-line-wrap {
+  min-height: 28px;
+}
+
+/* ---------- 妞妞、射龍門 ---------- */
+
+.niu-row {
+  grid-template-columns: 28px 1fr 56px;
+}
+
+.niu-total {
+  font-size: 16px;
+}
+
+.longmen-table {
+  align-items: center;
+}
+
+.longmen-posts {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 18px;
+  padding: 8px 0;
+}
+
+.longmen-gate {
+  min-width: 46px;
+  display: flex;
+  justify-content: center;
+}
+
+.longmen-slot {
+  width: 38px;
+  height: 52px;
+  border-radius: 6px;
+  border: 2px dashed rgba(255, 255, 255, 0.4);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: rgba(255, 255, 255, 0.6);
+  font-weight: 800;
+}
