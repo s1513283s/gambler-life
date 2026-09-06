@@ -3,7 +3,7 @@ import { cardLabel, isRed } from '../../venues/cards';
 
 interface Props {
   cards: Card[];
-  /** 動畫中：每張依序淡入 */
+  /** 動畫中：每張依序從牌背翻到正面 */
   revealing: boolean;
   /** 與其他列錯開的起始延遲（毫秒） */
   delayMs?: number;
@@ -20,10 +20,11 @@ export function PlayingCards({ cards, revealing, delayMs = 0, hiddenIndex = -1 }
         ) : (
           <span
             key={`${c}-${i}`}
-            className={`playing-card ${isRed(c) ? 'card-red' : ''} ${revealing ? 'card-deal' : ''}`}
-            style={revealing ? { animationDelay: `${delayMs + i * 300}ms` } : undefined}
+            className={`card-3d ${revealing ? 'card-flip' : ''}`}
+            style={revealing ? { animationDelay: `${delayMs + i * 320}ms` } : undefined}
           >
-            {cardLabel(c)}
+            <span className="playing-card card-back card-face" />
+            <span className={`playing-card card-face card-front ${isRed(c) ? 'card-red' : ''}`}>{cardLabel(c)}</span>
           </span>
         ),
       )}

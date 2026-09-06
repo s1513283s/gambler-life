@@ -35,8 +35,17 @@ export function TitleScreen() {
   };
 
   return (
-    <main className="screen screen-center">
-      <h1 className="title" onClick={onTitleTap}>
+    <main className="screen screen-center title-screen">
+      <div className="title-bg" aria-hidden="true">
+        {Array.from({ length: 7 }, (_, i) => (
+          <span
+            key={i}
+            className="floating-chip"
+            style={{ left: `${8 + i * 13}%`, animationDelay: `${i * 1.3}s`, animationDuration: `${9 + (i % 3) * 3}s` }}
+          />
+        ))}
+      </div>
+      <h1 className="title title-glow" onClick={onTitleTap}>
         賭徒人生
       </h1>
       <p className="muted">

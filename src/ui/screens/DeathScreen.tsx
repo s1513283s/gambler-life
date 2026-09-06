@@ -54,10 +54,11 @@ export function DeathScreen() {
   return (
     <main className="screen">
       <section className="card death-card">
+        <div className={`stamp ${state.phase === 'RETIRED' ? 'stamp-ok' : ''}`}>{state.phase === 'RETIRED' ? '上岸' : '死亡'}</div>
         <h2>{card.title}</h2>
         <dl>
-          {card.lines.map((line) => (
-            <div className="death-line" key={line.label}>
+          {card.lines.map((line, i) => (
+            <div className="death-line stagger" style={{ animationDelay: `${400 + i * 90}ms` }} key={line.label}>
               <dt>{line.label}</dt>
               <dd>{line.value}</dd>
             </div>

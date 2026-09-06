@@ -1,5 +1,7 @@
 import { useGame } from './store';
 import type { Phase } from './types';
+import { Confetti } from './ui/components/Confetti';
+import { FloatingDeltas } from './ui/components/FloatingDeltas';
 import { StatusBar } from './ui/components/StatusBar';
 import { ActionScreen } from './ui/screens/ActionScreen';
 import { DeathScreen } from './ui/screens/DeathScreen';
@@ -8,6 +10,7 @@ import { MorningScreen } from './ui/screens/MorningScreen';
 import { NightScreen } from './ui/screens/NightScreen';
 import { TitleScreen } from './ui/screens/TitleScreen';
 import { VenueScreen } from './ui/screens/VenueScreen';
+import { useCelebrations } from './ui/useCelebrations';
 import { useSoundEffects } from './ui/useSoundEffects';
 
 const SCREENS: Record<Phase, () => React.JSX.Element | null | undefined> = {
@@ -21,16 +24,26 @@ const SCREENS: Record<Phase, () => React.JSX.Element | null | undefined> = {
   RETIRED: DeathScreen,
 };
 
+/** 畫面切換的 key：phase 換就重播進場動畫；夜晚各步驟也算換畫面 */
+function screenKey(phase: Phase, nightStep: string | null): string {
+  return nightStep === null ? phase : `${phase}-${nightStep}`;
+}
+
 export default function App() {
   const state = useGame((s) => s.state);
   useSoundEffects(state);
+  const burst = useCelebrations();
   const Screen = SCREENS[state.phase];
   const showStatus = state.phase !== 'TITLE';
 
   return (
-    <div className="app">
+    <div className={`app phase-${state.phase.toLowerCase()}`}>
       {showStatus && <StatusBar state={state} />}
-      <Screen />
+      <div key={screenKey(state.phase, state.night?.step ?? null)} className="screen-enter">
+        <Screen />
+      </div>
+      <FloatingDeltas />
+      <Confetti burst={burst} />
     </div>
   );
 }

@@ -4,7 +4,19 @@ import { loanRoom } from '../../engine/economy';
 import { EVENT_TEXT } from '../../engine/events';
 import { liquidationValue } from '../../engine/stockReducer';
 import { useGame } from '../../store';
+import { AnimatedNumber } from '../components/AnimatedNumber';
 import { StockList } from '../components/StockList';
+
+function NightSky() {
+  return (
+    <div className="sky sky-night" aria-hidden="true">
+      <div className="moon" />
+      <div className="star s1" />
+      <div className="star s2" />
+      <div className="star s3" />
+    </div>
+  );
+}
 
 export function NightScreen() {
   const state = useGame((s) => s.state);
@@ -15,7 +27,8 @@ export function NightScreen() {
   if (night.step === 'EVENT') {
     return (
       <main className="screen">
-        <section className="card event-card">
+        <NightSky />
+        <section className="card event-card pop-in">
           <h2>晚上</h2>
           <p className="big">{EVENT_TEXT[night.event]}</p>
         </section>
@@ -61,9 +74,13 @@ export function NightScreen() {
 
   return (
     <main className="screen">
+      <NightSky />
       <section className="card">
         <h2>晚上</h2>
-        <p>付了開銷 ${formatMoney(night.expense)}。</p>
+        <p className="big danger">
+          -<AnimatedNumber value={night.expense} duration={900} prefix="$" />
+        </p>
+        <p className="muted small">今天的開銷。</p>
         {night.autoLoan > 0 && (
           <p className="warn">錢不夠，你又去找了阿龍，借了 ${formatMoney(night.autoLoan)}。</p>
         )}

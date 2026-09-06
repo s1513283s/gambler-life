@@ -906,3 +906,424 @@ button {
   color: var(--danger);
   transition: color 0.4s;
 }
+
+/* ===== 動態強化 ===== */
+
+/* 畫面切換 */
+.screen-enter {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  animation: screen-in 280ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+@keyframes screen-in {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.pop-in {
+  animation: pop-in 320ms cubic-bezier(0.2, 0.9, 0.3, 1.3);
+}
+
+@keyframes pop-in {
+  from {
+    opacity: 0;
+    transform: scale(0.85);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.btn:active:not(:disabled) {
+  transform: scale(0.97);
+}
+
+.btn,
+.chip,
+.odds-btn {
+  transition: transform 90ms ease, filter 120ms ease;
+}
+
+.tabular {
+  font-variant-numeric: tabular-nums;
+}
+
+.day-number {
+  display: inline-block;
+  animation: pop-in 400ms cubic-bezier(0.2, 0.9, 0.3, 1.4);
+}
+
+.day-title {
+  animation: pop-in 500ms cubic-bezier(0.2, 0.9, 0.3, 1.4);
+}
+
+.shake {
+  animation: shake 500ms ease;
+}
+
+@keyframes shake {
+  10%,
+  90% {
+    transform: translateX(-1px);
+  }
+  20%,
+  80% {
+    transform: translateX(2px);
+  }
+  30%,
+  50%,
+  70% {
+    transform: translateX(-4px);
+  }
+  40%,
+  60% {
+    transform: translateX(4px);
+  }
+}
+
+/* 精神低時整條脈動 */
+.sanity-low {
+  animation: sanity-pulse 1.2s ease-in-out infinite;
+}
+
+@keyframes sanity-pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgba(248, 113, 113, 0);
+  }
+  50% {
+    box-shadow: 0 0 10px 2px rgba(248, 113, 113, 0.55);
+  }
+}
+
+/* 飄字 */
+.float-layer {
+  position: fixed;
+  top: calc(env(safe-area-inset-top) + 56px);
+  left: 0;
+  right: 0;
+  z-index: 20;
+  pointer-events: none;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  padding-right: 16px;
+  max-width: 480px;
+  margin: 0 auto;
+}
+
+.float-delta {
+  font-weight: 800;
+  font-size: 20px;
+  text-shadow: 0 1px 4px rgba(0, 0, 0, 0.8);
+  animation: float-up 1100ms ease-out forwards;
+}
+
+.float-sanity {
+  font-size: 15px;
+  align-self: flex-start;
+  padding-left: 16px;
+}
+
+@keyframes float-up {
+  0% {
+    opacity: 0;
+    transform: translateY(8px) scale(0.9);
+  }
+  15% {
+    opacity: 1;
+    transform: translateY(0) scale(1.1);
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-46px) scale(1);
+  }
+}
+
+/* 3D 翻牌 */
+.card-3d {
+  position: relative;
+  width: 38px;
+  height: 52px;
+  transform-style: preserve-3d;
+}
+
+.card-face {
+  position: absolute;
+  inset: 0;
+  backface-visibility: hidden;
+}
+
+.card-front {
+  transform: rotateY(0deg);
+}
+
+.card-3d .card-back {
+  transform: rotateY(180deg);
+}
+
+.card-flip {
+  animation: card-flip 420ms ease-out both;
+}
+
+@keyframes card-flip {
+  0% {
+    transform: translateY(-18px) rotateY(180deg);
+    opacity: 0;
+  }
+  30% {
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(0) rotateY(0deg);
+    opacity: 1;
+  }
+}
+
+/* 結果字彈出 */
+.result-line:not(.muted) {
+  animation: pop-in 360ms cubic-bezier(0.2, 0.9, 0.3, 1.4);
+}
+
+/* 彩帶 */
+.confetti {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 30;
+  overflow: hidden;
+}
+
+.confetti-piece {
+  position: absolute;
+  top: -12px;
+  width: 8px;
+  height: 14px;
+  border-radius: 2px;
+  opacity: 0;
+  animation-name: confetti-fall;
+  animation-timing-function: ease-in;
+  animation-fill-mode: forwards;
+}
+
+@keyframes confetti-fall {
+  0% {
+    opacity: 1;
+    transform: translate(0, 0) rotate(var(--rot));
+  }
+  100% {
+    opacity: 0;
+    transform: translate(var(--drift), 100vh) rotate(calc(var(--rot) + 540deg));
+  }
+}
+
+/* 死亡印章與逐行進場 */
+.death-card {
+  position: relative;
+  overflow: hidden;
+}
+
+.stamp {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  padding: 4px 14px;
+  border: 4px solid var(--danger);
+  border-radius: 8px;
+  color: var(--danger);
+  font-size: 30px;
+  font-weight: 900;
+  letter-spacing: 0.2em;
+  transform: rotate(-12deg);
+  opacity: 0.9;
+  animation: stamp-in 500ms cubic-bezier(0.2, 0.9, 0.3, 1.3) 250ms both;
+}
+
+.stamp-ok {
+  border-color: var(--ok);
+  color: var(--ok);
+}
+
+@keyframes stamp-in {
+  from {
+    opacity: 0;
+    transform: rotate(-12deg) scale(2.2);
+  }
+  to {
+    opacity: 0.9;
+    transform: rotate(-12deg) scale(1);
+  }
+}
+
+.stagger {
+  opacity: 0;
+  animation: screen-in 320ms ease-out forwards;
+}
+
+/* 標題背景漂浮籌碼與標題光暈 */
+.title-screen {
+  position: relative;
+  overflow: hidden;
+}
+
+.title-bg {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.floating-chip {
+  position: absolute;
+  bottom: -40px;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 35%, #ffe08a, #b8860b);
+  box-shadow: inset 0 0 0 4px rgba(0, 0, 0, 0.25);
+  opacity: 0;
+  animation: chip-rise linear infinite;
+}
+
+@keyframes chip-rise {
+  0% {
+    transform: translateY(0) rotate(0deg);
+    opacity: 0;
+  }
+  10% {
+    opacity: 0.35;
+  }
+  90% {
+    opacity: 0.2;
+  }
+  100% {
+    transform: translateY(-110vh) rotate(360deg);
+    opacity: 0;
+  }
+}
+
+.title-glow {
+  position: relative;
+  animation: title-glow 3s ease-in-out infinite;
+}
+
+@keyframes title-glow {
+  0%,
+  100% {
+    text-shadow: 0 0 6px rgba(245, 197, 66, 0.2);
+  }
+  50% {
+    text-shadow: 0 0 22px rgba(245, 197, 66, 0.7);
+  }
+}
+
+.title-screen .btn,
+.title-screen p,
+.title-screen .chip {
+  position: relative;
+}
+
+/* 早晚天空 */
+.sky {
+  position: relative;
+  height: 90px;
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+
+.sky-morning {
+  background: linear-gradient(180deg, #1e3a5f, #f59e0b 140%);
+}
+
+.sun {
+  position: absolute;
+  left: 50%;
+  bottom: -30px;
+  width: 64px;
+  height: 64px;
+  margin-left: -32px;
+  border-radius: 50%;
+  background: radial-gradient(circle, #fde68a, #f59e0b);
+  box-shadow: 0 0 30px 8px rgba(245, 158, 11, 0.5);
+  animation: sun-rise 1.2s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+
+@keyframes sun-rise {
+  from {
+    transform: translateY(60px);
+  }
+  to {
+    transform: translateY(0);
+  }
+}
+
+.sky-night {
+  background: linear-gradient(180deg, #0b1020, #1c1f27);
+}
+
+.moon {
+  position: absolute;
+  right: 28px;
+  top: 16px;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: #fef3c7;
+  box-shadow: inset -12px -6px 0 0 #0b1020, 0 0 24px 4px rgba(254, 243, 199, 0.25);
+  animation: pop-in 700ms ease-out both;
+}
+
+.star {
+  position: absolute;
+  width: 3px;
+  height: 3px;
+  border-radius: 50%;
+  background: #fff;
+  animation: twinkle 2s ease-in-out infinite;
+}
+
+.star.s1 {
+  left: 18%;
+  top: 22px;
+}
+
+.star.s2 {
+  left: 38%;
+  top: 48px;
+  animation-delay: 0.6s;
+}
+
+.star.s3 {
+  left: 60%;
+  top: 18px;
+  animation-delay: 1.2s;
+}
+
+@keyframes twinkle {
+  0%,
+  100% {
+    opacity: 0.3;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+/* 尊重系統的減少動態設定 */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
