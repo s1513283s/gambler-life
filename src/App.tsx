@@ -35,15 +35,19 @@ export default function App() {
   const burst = useCelebrations();
   const Screen = SCREENS[state.phase];
   const showStatus = state.phase !== 'TITLE';
+  const tilt = state.tilt && showStatus;
 
   return (
-    <div className={`app phase-${state.phase.toLowerCase()}`}>
-      {showStatus && <StatusBar state={state} />}
-      <div key={screenKey(state.phase, state.night?.step ?? null)} className="screen-enter">
-        <Screen />
+    <div className="stage">
+      <div className={`app phase-${state.phase.toLowerCase()} ${tilt ? 'app-tilt' : ''}`}>
+        <div className="app-vignette" aria-hidden="true" />
+        {showStatus && <StatusBar state={state} />}
+        <div key={screenKey(state.phase, state.night?.step ?? null)} className="screen-enter">
+          <Screen />
+        </div>
+        <FloatingDeltas />
+        <Confetti burst={burst} />
       </div>
-      <FloatingDeltas />
-      <Confetti burst={burst} />
     </div>
   );
 }
