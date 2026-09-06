@@ -1,0 +1,356 @@
+import type { Candle, CryptoSegment, NbaGame, NbaGameDay, StockSegment } from './data/schema';
+
+export type Phase =
+  | 'TITLE'
+  | 'MORNING'
+  | 'ACTION'
+  | 'VENUE'
+  | 'EVENING'
+  | 'NIGHT'
+  | 'DEATH'
+  | 'RETIRED';
+
+export type VenueId =
+  | 'baccarat'
+  | 'blackjack'
+  | 'crypto'
+  | 'stocks'
+  | 'scratch'
+  | 'nba'
+  | 'parlay';
+
+export const VENUE_IDS: readonly VenueId[] = [
+  'baccarat',
+  'blackjack',
+  'crypto',
+  'stocks',
+  'scratch',
+  'nba',
+  'parlay',
+];
+
+/** 今天的主行動。GAMBLE 代表進過場子。 */
+export type DayAction = 'WORK' | 'REST' | 'GAMBLE' | 'NONE';
+
+export type DeathCause = 'RENT' | 'SANITY';
+
+export type NbaMarket = 'ml' | 'spread' | 'total';
+export type NbaSide = 'home' | 'away' | 'over' | 'under';
+
+/** 玩家選的一腿，賠率與盤口由 reducer 從今日賽程填入，不信任前端送來的數字 */
+export interface NbaLegPick {
+  gameId: string;
+  market: NbaMarket;
+  side: NbaSide;
+}
+
+export interface NbaBetLeg extends NbaLegPick {
+  odds: number; // 十進位賠率
+  line: number; // 讓分或大小分盤口；獨贏為 0
+  home: string;
+  away: string;
+}
+
+/** 單注與串關共用，串關 legs.length > 1 */
+export interface NbaBet {
+  id: string;
+  stake: number;
+  legs: NbaBetLeg[];
+}
+
+export type NbaLegOutcome = 'win' | 'loss' | 'push';
+
+export interface NbaBetResult {
+  bet: NbaBet;
+  outcomes: NbaLegOutcome[];
+  payout: number; // 退還總額（含本金），0 = 輸
+  scores: { home: number; away: number }[]; // 與 legs 對齊
+}
+
+export interface StockPosition {
+  slot: number; // 今日市場的第幾支（0-4）
+  units: number; // 持有股數，可為小數
+  avgCost: number; // 平均成本，單位基點（10000 = 100 元）
+}
+
+/** 一支假公司。closes 已把多段切片接續好，起點 10000。 */
+export interface StockSlot {
+  name: string;
+  segmentIds: string[];
+  closes: number[];
+}
+
+export interface VenueStats {
+  wagered: number;
+  net: number;
+  sessions: number;
+}
+
+export interface RunStats {
+  peakNetWorth: number;
+  totalWagered: number;
+  totalEvGiven: number; // 累計 注金 x 該場子莊家優勢
+  biggestWin: number;
+  biggestLoss: number;
+  tiltEpisodes: number;
+  daysWorked: number;
+  daysGambled: number;
+  daysRested: number;
+  loansTaken: number;
+  parlaysPlaced: number;
+  parlaysWon: number;
+  bjDecisions: number; // 21 點決策數
+  bjMistakes: number; // 偏離基本策略次數
+  byVenue: Record<VenueId, VenueStats>;
+  causeOfDeath?: DeathCause;
+}
+
+export interface DayLog {
+  day: number;
+  cash: number;
+  debt: number;
+  sanity: number;
+  action: DayAction;
+  venueNet: number;
+  expense: number;
+}
+
+export type EventId =
+  | 'nothing'
+  | 'bike_broke'
+  | 'friend_repays'
+  | 'overtime_pay'
+  | 'rent_hike'
+  | 'found_money'
+  | 'sick'
+  | 'insider_tip';
+
+/** 事件表的一列。效果欄位全部可選，沒寫就是沒有該效果。 */
+export interface EventDef {
+  id: EventId;
+  weight: number;
+  cash?: number;
+  sanity?: number;
+  expenseMultiplier?: number; // 乘上去，永久
+  requiresWork?: boolean; // 當天沒打工則視為無事發生
+  blocksWorkTomorrow?: boolean;
+  insiderTip?: boolean; // 明天 NBA 某場顯示內線標記
+}
+
+/** 0-51：rank = card % 13（0 = A … 12 = K），suit = floor(card / 13） */
+export type Card = number;
+
+export type BaccaratSide = 'banker' | 'player' | 'tie';
+
+export interface BaccaratHand {
+  player: Card[];
+  banker: Card[];
+  playerTotal: number;
+  bankerTotal: number;
+  outcome: BaccaratSide;
+}
+
+/** 已發牌但尚未派彩。注金已扣，派彩在 BACCARAT_RESOLVE 才進帳，動畫期間重整可從此續播。 */
+export interface BaccaratPending {
+  side: BaccaratSide;
+  stake: number;
+  hand: BaccaratHand;
+}
+
+export interface BaccaratResult extends BaccaratPending {
+  payout: number; // 退還給玩家的總額（含本金），0 表示全輸
+}
+
+export interface BaccaratSession {
+  kind: 'baccarat';
+  shoe: Card[];
+  cursor: number; // 下一張要發的位置
+  handsPlayed: number;
+  net: number; // 本次進場淨損益
+  pending: BaccaratPending | null;
+  lastResult: BaccaratResult | null;
+}
+
+export type BlackjackMove = 'hit' | 'stand' | 'double' | 'split';
+
+export interface BjHand {
+  cards: Card[];
+  stake: number; // 加倍後是原注的兩倍
+  done: boolean;
+  fromSplit: boolean; // 分牌後的 21 不算黑傑克
+}
+
+export type BlackjackStage = 'PLAYER' | 'DEALER' | 'DONE';
+
+/**
+ * 一局 21 點。PLAYER：等玩家決策；DEALER：莊家已補完、派彩已算好但未進帳（動畫中）；
+ * DONE：已派彩，等下一局。重整在任何 stage 都能續。
+ */
+export interface BlackjackRound {
+  hands: BjHand[]; // 1 手，分牌後 2 手
+  active: number; // 等決策的手牌索引
+  dealer: Card[]; // dealer[0] 明牌，dealer[1] 底牌
+  stage: BlackjackStage;
+  payouts: number[]; // 每手退還總額，DEALER 階段算好
+}
+
+export interface BlackjackSession {
+  kind: 'blackjack';
+  shoe: Card[];
+  cursor: number;
+  handsPlayed: number;
+  net: number;
+  round: BlackjackRound | null; // null = 等下注
+}
+
+export interface ScratchTicket {
+  price: number;
+  prize: number; // 0 = 銘謝惠顧；等於 price = 回本
+}
+
+export interface ScratchSession {
+  kind: 'scratch';
+  handsPlayed: number; // 刮了幾張
+  net: number;
+  ticket: ScratchTicket | null; // 已買未刮，獎金已決定，刮開只是揭曉
+  lastTicket: ScratchTicket | null;
+}
+
+export type CryptoDirection = 'long' | 'short';
+
+export interface CryptoPosition {
+  direction: CryptoDirection;
+  leverage: number;
+  margin: number;
+  entryPrice: number; // 含滑點，單位基點
+  entryIndex: number;
+  takeProfitPct: number | null; // 保證金報酬率 %，null = 不設
+  stopLossPct: number | null;
+}
+
+export type CryptoExitReason = 'closed' | 'tp' | 'sl' | 'liquidated' | 'expired';
+
+export interface CryptoRoundResult {
+  position: CryptoPosition;
+  exitPrice: number;
+  exitIndex: number;
+  reason: CryptoExitReason;
+  pnl: number; // 已扣手續費；爆倉 = -margin
+}
+
+/** 存進 session 的切片副本，重整後不需要再載資料檔。 */
+export interface CryptoSegmentRef {
+  id: string;
+  symbol: string;
+  candles: Candle[];
+}
+
+export interface CryptoSession {
+  kind: 'crypto';
+  segment: CryptoSegmentRef | null; // null = 等 UI 載入資料後 NEW_SEGMENT
+  cursor: number; // 目前顯示到第幾根（含）
+  playing: boolean; // TICK 推進中
+  roundDone: boolean; // 這段已結算，要再玩得 NEW_SEGMENT
+  position: CryptoPosition | null;
+  handsPlayed: number;
+  net: number;
+  lastResult: CryptoRoundResult | null;
+}
+
+/** 場內進行中的狀態全部住在這裡，重整等於從同一狀態繼續。 */
+export type VenueSession = BaccaratSession | BlackjackSession | ScratchSession | CryptoSession;
+export type VenueKind = VenueSession['kind'];
+
+export type NightOutcome = 'CONTINUE' | 'RETIRE_OFFER' | 'DEATH';
+
+export interface NightSettlement {
+  step: 'SETTLE';
+  expense: number;
+  autoLoan: number; // 付不出開銷時自動向阿龍借的金額，0 表示沒借
+  interest: number; // 今晚產生的利息
+  harassed: boolean; // 討債電話
+  outcome: NightOutcome;
+  deathCause: DeathCause | null;
+}
+
+/**
+ * NIGHT 是一台小狀態機：EVENT（事件 modal，效果已套用）-> LIQUIDATE（付不出開銷且有持股時問要不要砍）-> SETTLE。
+ * 每一步都存在 state 裡，重整後從同一步續玩。
+ */
+export type NightReport =
+  | { step: 'EVENT'; event: EventId }
+  | { step: 'LIQUIDATE'; shortfall: number } // 還差多少才付得出今晚開銷
+  | NightSettlement;
+
+export interface GameState {
+  saveVersion: number;
+  runId: string;
+  seed: number;
+  rngState: number; // mulberry32 狀態，所有遊戲內亂數由此推進
+  day: number; // 從 1 開始
+  phase: Phase;
+  cash: number;
+  debt: number; // 地下錢莊本利和
+  sanity: number; // 0-100
+  tilt: boolean; // 上頭狀態
+  dailyExpense: number; // 今日應付開銷（已含成長與事件加成）
+  expenseMultiplier: number; // 事件造成的永久加成
+  actionUsedToday: boolean;
+  todayAction: DayAction;
+  workBlockedUntilDay: number; // day <= 此值時不能打工（生病），0 表示沒限制
+  insiderTipDay: number; // 等於今天時 NBA 顯示內線標記，0 表示沒有
+  venue: VenueSession | null; // phase === 'VENUE' 時必有
+  venueNetToday: number;
+  usedCryptoIds: string[]; // 本局玩過的切片，抽完才重複 // 今天在場子的淨損益，寫進 DayLog 後歸零
+  nbaBets: NbaBet[]; // 今天已下、待結算
+  nbaDayIndex: number; // 每天 +1，對應 nbaDayOrder 的位置
+  nbaDayOrder: number[] | null; // 打亂的比賽日索引，-1 = 無賽事；第一次載入賽程時建立
+  nbaToday: NbaGame[] | null; // 今日賽程副本，EVENING 用它結算
+  nbaTodayDay: number; // nbaToday 對應的 day，不同就要重新載入
+  insiderGameId: string | null; // 朋友報的明牌（純陷阱）
+  nbaResults: NbaBetResult[]; // 今晚已揭曉的注單
+  parlaysToday: number;
+  stockMarket: StockSlot[] | null; // 第一次開股票畫面時建立，整局固定
+  stockPositions: StockPosition[];
+  stockDayIndex: number; // 指向每支 closes 的今日收盤
+  unlockedVenues: VenueId[];
+  night: NightReport | null;
+  stats: RunStats;
+  history: DayLog[];
+}
+
+export type GameAction =
+  | { type: 'NEW_RUN'; seed: number; runId: string }
+  | { type: 'START_DAY' } // MORNING -> ACTION
+  | { type: 'WORK' }
+  | { type: 'REST' }
+  | { type: 'BORROW'; amount: number } // 不佔主行動
+  | { type: 'REPAY'; amount: number } // 不佔主行動
+  | { type: 'ENTER_VENUE'; venue: VenueKind } // ACTION -> VENUE，佔主行動
+  | { type: 'BACCARAT_BET'; side: BaccaratSide; stake: number } // 扣注金、發牌
+  | { type: 'BACCARAT_RESOLVE' } // 派彩、精神、統計
+  | { type: 'BLACKJACK_DEAL'; stake: number } // 扣注金、發牌、檢查黑傑克
+  | { type: 'BLACKJACK_MOVE'; move: BlackjackMove } // 玩家決策，記錄與基本策略的差異
+  | { type: 'BLACKJACK_RESOLVE' } // 派彩、精神、統計
+  | { type: 'SCRATCH_BUY'; price: number } // 扣錢、擲獎、每張精神 -2
+  | { type: 'SCRATCH_REVEAL' } // 獎金進帳
+  | { type: 'CRYPTO_NEW_SEGMENT'; pool: readonly CryptoSegment[] } // 從資料池抽一段沒玩過的
+  | { type: 'CRYPTO_OPEN'; direction: CryptoDirection; leverage: number; margin: number; takeProfitPct: number | null; stopLossPct: number | null }
+  | { type: 'CRYPTO_TICK' } // 播下一根 K，檢查爆倉 / 停利停損 / 播完
+  | { type: 'CRYPTO_CLOSE' } // 手動平倉
+  | { type: 'STOCK_OPEN_MARKET'; pool: readonly StockSegment[]; names: readonly string[] } // 建立五支假公司
+  | { type: 'STOCK_BUY'; slot: number; amount: number } // 不佔主行動，精神 -3
+  | { type: 'STOCK_SELL'; slot: number; fraction: 0.5 | 1 } // 不佔主行動，精神 -3，實現損益另計
+  | { type: 'NIGHT_SKIP_LIQUIDATE' } // NIGHT.LIQUIDATE -> SETTLE
+  | { type: 'NBA_LOAD_DAY'; pool: readonly NbaGameDay[] } // 載入今日賽程（第一次順便建打亂順序）
+  | { type: 'NBA_BET'; legs: NbaLegPick[]; stake: number } // 單注或串關，精神 -5
+  | { type: 'EVENING_REVEAL' } // 結算下一張注單
+  | { type: 'EVENING_DONE' } // 全部揭曉後進 NIGHT
+  | { type: 'LEAVE_VENUE' } // VENUE -> ACTION
+  | { type: 'END_DAY' } // ACTION -> NIGHT（擲事件；有事件停在 EVENT，否則直接 SETTLE）
+  | { type: 'NIGHT_ACK_EVENT' } // NIGHT.EVENT -> NIGHT.SETTLE
+  | { type: 'NEXT_DAY' } // NIGHT.SETTLE -> MORNING 或 DEATH
+  | { type: 'RETIRE' } // NIGHT.SETTLE（上岸提議）-> RETIRED
+  | { type: 'BACK_TO_TITLE' };
+
+export type GameActionType = GameAction['type'];

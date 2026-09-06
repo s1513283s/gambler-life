@@ -1,0 +1,908 @@
+:root {
+  --bg: #111318;
+  --surface: #1c1f27;
+  --surface-2: #262a35;
+  --text: #f2f3f5;
+  --muted: #9aa0ad;
+  --ok: #4ade80;
+  --warn: #fbbf24;
+  --danger: #f87171;
+  --primary: #f5c542;
+  --primary-text: #1a1400;
+  --radius: 14px;
+  color-scheme: dark;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: -apple-system, 'PingFang TC', 'Noto Sans TC', 'Microsoft JhengHei', system-ui, sans-serif;
+  font-size: 16px;
+  line-height: 1.5;
+  -webkit-text-size-adjust: 100%;
+  overscroll-behavior: none;
+}
+
+button {
+  font: inherit;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+  user-select: none;
+}
+
+.app {
+  min-height: 100dvh;
+  max-width: 480px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  padding-top: env(safe-area-inset-top);
+}
+
+/* 狀態列 */
+.statusbar {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: var(--surface);
+  padding: 12px 16px 10px;
+  border-bottom: 1px solid #2c3140;
+}
+
+.statusbar-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+}
+
+.statusbar-day {
+  font-weight: 600;
+}
+
+.statusbar-cash {
+  font-size: 22px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.statusbar-sub {
+  color: var(--muted);
+  font-size: 13px;
+  margin-top: 2px;
+}
+
+.sanity {
+  margin-top: 8px;
+}
+
+.sanity-label {
+  display: flex;
+  justify-content: space-between;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.tilt-tag {
+  color: var(--danger);
+  font-weight: 600;
+}
+
+.sanity-track {
+  height: 8px;
+  background: var(--surface-2);
+  border-radius: 4px;
+  overflow: hidden;
+  margin-top: 4px;
+}
+
+.sanity-fill {
+  height: 100%;
+  border-radius: 4px;
+  transition: width 0.3s ease;
+}
+
+.sanity-ok {
+  background: var(--ok);
+}
+
+.sanity-warn {
+  background: var(--warn);
+}
+
+.sanity-danger {
+  background: var(--danger);
+}
+
+/* 畫面容器 */
+.screen {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px 16px calc(16px + env(safe-area-inset-bottom));
+}
+
+.screen-center {
+  justify-content: center;
+  align-items: center;
+  text-align: center;
+}
+
+.spacer {
+  flex: 1;
+}
+
+.card {
+  background: var(--surface);
+  border-radius: var(--radius);
+  padding: 16px;
+}
+
+.card h2 {
+  margin: 0 0 8px;
+  font-size: 18px;
+}
+
+.card p {
+  margin: 6px 0;
+}
+
+.title {
+  font-size: 40px;
+  margin: 0 0 8px;
+  letter-spacing: 0.1em;
+}
+
+.muted {
+  color: var(--muted);
+}
+
+.small {
+  font-size: 13px;
+}
+
+.ok {
+  color: var(--ok);
+}
+
+.warn {
+  color: var(--warn);
+}
+
+.danger {
+  color: var(--danger);
+}
+
+.big {
+  font-size: 20px;
+  font-weight: 700;
+}
+
+/* 按鈕 */
+.btn {
+  width: 100%;
+  min-height: 56px;
+  border: none;
+  border-radius: var(--radius);
+  background: var(--surface-2);
+  color: var(--text);
+  font-size: 17px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.btn:active {
+  filter: brightness(1.15);
+}
+
+.btn:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.btn-primary {
+  background: var(--primary);
+  color: var(--primary-text);
+}
+
+.btn-big {
+  min-height: 96px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+}
+
+.btn-title {
+  font-size: 22px;
+}
+
+.btn-sub {
+  font-size: 13px;
+  font-weight: 400;
+  color: var(--muted);
+}
+
+.btn-primary .btn-sub {
+  color: var(--primary-text);
+}
+
+.action-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+/* 死亡卡片 */
+.death-card dl {
+  margin: 0;
+}
+
+.death-line {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 6px 0;
+  border-bottom: 1px solid #2c3140;
+}
+
+.death-line:last-child {
+  border-bottom: none;
+}
+
+.death-line dt {
+  color: var(--muted);
+}
+
+.death-line dd {
+  margin: 0;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+/* 鍵值列（地下錢莊） */
+.kv {
+  display: flex;
+  justify-content: space-between;
+  padding: 4px 0;
+  font-variant-numeric: tabular-nums;
+}
+
+/* 事件 modal */
+.event-card {
+  border: 1px solid var(--primary);
+}
+
+/* 百家樂桌面 */
+.table {
+  background: #14532d;
+  border: 2px solid #166534;
+  border-radius: var(--radius);
+  padding: 14px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-height: 170px;
+}
+
+.hand-row {
+  display: grid;
+  grid-template-columns: 28px 1fr 32px;
+  align-items: center;
+  gap: 8px;
+}
+
+.hand-label {
+  font-weight: 700;
+  color: #bbf7d0;
+}
+
+.hand-cards {
+  display: flex;
+  gap: 6px;
+  min-height: 52px;
+}
+
+.playing-card {
+  width: 38px;
+  height: 52px;
+  border-radius: 6px;
+  background: #fff;
+  color: #111;
+  font-weight: 700;
+  font-size: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.card-red {
+  color: #dc2626;
+}
+
+.card-deal {
+  opacity: 0;
+  animation: deal 250ms ease-out forwards;
+}
+
+@keyframes deal {
+  from {
+    opacity: 0;
+    transform: translateY(-16px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.hand-total {
+  font-size: 20px;
+  font-weight: 700;
+  text-align: right;
+  color: #bbf7d0;
+}
+
+.hidden-until-reveal {
+  opacity: 0;
+  animation: fade-in 1ms linear 1800ms forwards;
+}
+
+@keyframes fade-in {
+  to {
+    opacity: 1;
+  }
+}
+
+.result-line {
+  text-align: center;
+  font-weight: 700;
+  font-size: 18px;
+  min-height: 27px;
+}
+
+.side-grid {
+  display: grid;
+  grid-template-columns: 1fr 0.7fr 1fr;
+  gap: 8px;
+}
+
+.side-btn {
+  min-height: 64px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  border: 2px solid transparent;
+}
+
+.side-active {
+  border-color: var(--primary);
+  background: #3a3520;
+}
+
+.stake-card input[type='range'] {
+  width: 100%;
+  margin: 8px 0;
+  accent-color: var(--primary);
+}
+
+.chip-row {
+  display: flex;
+  gap: 6px;
+}
+
+.chip {
+  flex: 1;
+  min-height: 40px;
+  border: none;
+  border-radius: 999px;
+  background: var(--surface-2);
+  color: var(--text);
+  font-weight: 600;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.chip:disabled {
+  opacity: 0.4;
+}
+
+.venue-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+}
+
+.btn-small {
+  width: auto;
+  min-height: 44px;
+  padding: 0 16px;
+  font-size: 15px;
+}
+
+.venue-row {
+  display: flex;
+  gap: 10px;
+  overflow-x: auto;
+  padding-bottom: 4px;
+}
+
+.venue-btn {
+  flex: 0 0 140px;
+  min-height: 72px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+/* 21 點 */
+.card-back {
+  background: repeating-linear-gradient(45deg, #1e3a8a 0 4px, #1d4ed8 4px 8px);
+  border: 2px solid #fff;
+}
+
+.hand-active {
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 8px;
+}
+
+.hand-total small {
+  display: block;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.move-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.move-grid .btn-big {
+  min-height: 72px;
+}
+
+/* 刮刮樂 */
+.gold {
+  color: var(--primary);
+}
+
+.ticket-area {
+  min-height: 190px;
+}
+
+.ticket {
+  background: linear-gradient(160deg, #7c2d12, #b45309);
+  border-radius: var(--radius);
+  padding: 12px;
+  color: #fff7ed;
+}
+
+.ticket-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 170px;
+  background: var(--surface);
+}
+
+.ticket-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-weight: 700;
+  margin-bottom: 10px;
+}
+
+.ticket-head .chip {
+  flex: 0 0 auto;
+  padding: 0 14px;
+  background: rgba(0, 0, 0, 0.3);
+  color: #fff7ed;
+}
+
+.ticket-window {
+  position: relative;
+  height: 120px;
+  border-radius: 10px;
+  background: #fffbeb;
+  overflow: hidden;
+}
+
+.ticket-prize {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 28px;
+  font-weight: 800;
+}
+
+.ticket-prize.muted {
+  color: #78716c;
+}
+
+.ticket-prize.warn {
+  color: #b45309;
+}
+
+.ticket-prize.ok {
+  color: #15803d;
+}
+
+.scratch-mask {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  touch-action: none;
+  cursor: crosshair;
+}
+
+.ticket-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 8px;
+}
+
+.ticket-grid .btn-big {
+  min-height: 76px;
+}
+
+/* 幣圈合約 */
+.chart-card {
+  background: var(--surface);
+  border-radius: var(--radius);
+  padding: 10px 12px 12px;
+  position: relative;
+}
+
+.chart-head {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 6px;
+  font-variant-numeric: tabular-nums;
+}
+
+.candle-chart {
+  display: block;
+  width: 100%;
+  height: 200px;
+}
+
+.pnl-float {
+  position: absolute;
+  top: 34px;
+  left: 16px;
+  font-size: 22px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  text-shadow: 0 1px 4px rgba(0, 0, 0, 0.8);
+}
+
+.pnl-float small {
+  font-size: 13px;
+}
+
+.side-grid.two {
+  grid-template-columns: 1fr 1fr;
+}
+
+.chip-active {
+  background: var(--primary);
+  color: var(--primary-text);
+}
+
+.tpsl-row {
+  display: grid;
+  grid-template-columns: 36px 1fr;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 0;
+}
+
+.card input[type='range'] {
+  width: 100%;
+  margin: 8px 0;
+  accent-color: var(--primary);
+}
+
+.liq-flash {
+  position: fixed;
+  inset: 0;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 64px;
+  font-weight: 900;
+  color: #fff;
+  background: rgba(220, 38, 38, 0.85);
+  animation: liq-flash 700ms ease-out forwards;
+  pointer-events: none;
+}
+
+@keyframes liq-flash {
+  0% {
+    opacity: 1;
+  }
+  70% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+/* 股票 */
+.stock-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.stock-card {
+  padding: 10px 12px;
+}
+
+.stock-head {
+  width: 100%;
+  display: grid;
+  grid-template-columns: 1fr 90px auto;
+  align-items: center;
+  gap: 10px;
+  background: none;
+  border: none;
+  color: inherit;
+  padding: 0;
+  text-align: left;
+  cursor: pointer;
+}
+
+.stock-title {
+  display: flex;
+  flex-direction: column;
+}
+
+.stock-name {
+  font-weight: 700;
+}
+
+.sparkline {
+  width: 90px;
+  height: 32px;
+}
+
+.stock-price {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+}
+
+.stock-actions {
+  margin-top: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.stock-open {
+  border: 1px solid var(--primary);
+}
+
+/* NBA */
+.action-grid.three {
+  grid-template-columns: 1fr 1fr 1fr;
+}
+
+.mode-toggle {
+  display: flex;
+  gap: 6px;
+}
+
+.mode-toggle .chip {
+  flex: 0 0 auto;
+  padding: 0 14px;
+}
+
+.game-card {
+  padding: 10px 12px;
+}
+
+.game-insider {
+  border: 1px solid var(--primary);
+}
+
+.game-head {
+  display: flex;
+  justify-content: space-between;
+  font-weight: 700;
+  margin-bottom: 8px;
+}
+
+.insider-tag {
+  color: var(--primary);
+  font-size: 12px;
+}
+
+.odds-grid {
+  display: grid;
+  grid-template-columns: 34px 1fr 1fr;
+  gap: 6px;
+  align-items: center;
+}
+
+.odds-btn {
+  min-height: 44px;
+  border: 1px solid transparent;
+  border-radius: 10px;
+  background: var(--surface-2);
+  color: var(--text);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0 10px;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.odds-active {
+  border-color: var(--primary);
+  background: #3a3520;
+}
+
+.odds-value {
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.slip {
+  border: 1px solid var(--primary);
+}
+
+.bet-line {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 4px 0;
+  border-bottom: 1px solid #2c3140;
+}
+
+.bet-line:last-child {
+  border-bottom: none;
+}
+
+.result-card {
+  animation: fade-up 300ms ease-out;
+}
+
+@keyframes fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.ok-border {
+  border: 1px solid var(--ok);
+}
+
+.danger-border {
+  border: 1px solid var(--danger);
+}
+
+.muted-border {
+  border: 1px solid #2c3140;
+}
+
+.leg-line {
+  display: grid;
+  grid-template-columns: 20px 1fr auto;
+  gap: 8px;
+  align-items: center;
+  padding: 3px 0;
+}
+
+.leg-icon {
+  font-weight: 800;
+}
+
+.leg-icon.win {
+  color: var(--ok);
+}
+
+.leg-icon.loss {
+  color: var(--danger);
+}
+
+.leg-icon.push {
+  color: var(--muted);
+}
+
+/* 排行榜、資料、卡片預覽、音效 */
+.board-row {
+  display: grid;
+  grid-template-columns: 28px 1fr auto;
+  grid-template-areas:
+    'rank days peak'
+    'rank cause peak';
+  gap: 2px 10px;
+  align-items: center;
+  padding: 8px 0;
+  border-bottom: 1px solid #2c3140;
+}
+
+.board-row:last-of-type {
+  border-bottom: none;
+}
+
+.board-rank {
+  grid-area: rank;
+  font-weight: 800;
+  color: var(--primary);
+}
+
+.board-days {
+  grid-area: days;
+  font-weight: 600;
+}
+
+.board-row .muted {
+  grid-area: cause;
+}
+
+.board-row .small:last-child {
+  grid-area: peak;
+  text-align: right;
+}
+
+.data-box {
+  width: 100%;
+  min-height: 160px;
+  margin-top: 10px;
+  background: var(--surface-2);
+  color: var(--text);
+  border: none;
+  border-radius: 10px;
+  padding: 10px;
+  font: 12px monospace;
+}
+
+.death-preview {
+  width: 100%;
+  border-radius: 10px;
+  margin-top: 8px;
+}
+
+.title-chip {
+  flex: 0 0 auto;
+  width: auto;
+  padding: 0 16px;
+  margin-top: 8px;
+}
+
+.cash-up {
+  color: var(--ok);
+  transition: color 0.4s;
+}
+
+.cash-down {
+  color: var(--danger);
+  transition: color 0.4s;
+}

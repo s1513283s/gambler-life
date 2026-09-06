@@ -1,0 +1,135 @@
+import type { EventDef } from './types';
+
+/**
+ * 所有可調數值的唯一真相來源。
+ * 調平衡只改這裡，engine 與 ui 不得硬編數字。
+ */
+export const CONFIG = {
+  SAVE_VERSION: 8,
+
+  // 經濟
+  START_CASH: 30000,
+  BASE_EXPENSE: 1000,
+  EXPENSE_GROWTH: 0.02, // 每日 +2%
+  WAGE: 800,
+
+  // 精神
+  SANITY_MAX: 100,
+  SANITY_START: 80,
+  WORK_SANITY_COST: 15,
+  REST_SANITY_GAIN: 30,
+  NBA_BET_SANITY_COST: 5,
+  GAMBLE_WIN_SANITY: 3,
+  GAMBLE_LOSS_SANITY: 5,
+  TILT_THRESHOLD: 30, // 低於此值進入上頭
+  TILT_EXIT: 45, // 高於此值解除
+  TILT_MIN_BET_RATIO: 0.25, // 上頭時最小注碼 = 現金 25%
+  TILT_FORCED_HANDS: 3, // 上頭時進場至少玩 3 局才能走
+
+  // 地下錢莊
+  LOAN_CAP: 50000,
+  LOAN_DAILY_RATE: 0.03,
+  LOAN_UNIT: 5000,
+  DEBT_HARASS_THRESHOLD: 30000,
+  HARASS_SANITY_COST: 10,
+
+  // 上岸
+  RETIRE_THRESHOLD: 1000000,
+
+  // 百家樂
+  BACCARAT_MIN_BET: 100,
+  BACCARAT_DECKS: 8,
+  BACCARAT_CUT_CARD: 52, // 牌靴剩不到這麼多張就重洗
+  BACCARAT_COMMISSION: 0.05, // 莊贏抽 5%
+  BACCARAT_TIE_PAYOUT: 8, // 和局 8:1
+  BACCARAT_EDGE: { banker: 0.0106, player: 0.0124, tie: 0.144 },
+  BACCARAT_REVEAL_MS: 2000, // 發牌動畫
+  BACCARAT_RESULT_MS: 1000, // 結果停留
+
+  // 21 點
+  BLACKJACK_MIN_BET: 100,
+  BLACKJACK_DECKS: 6,
+  BLACKJACK_PAYOUT: 1.5, // 黑傑克 3:2
+  BLACKJACK_CUT_CARD: 52,
+  BLACKJACK_BASE_EDGE: 0.005,
+  BLACKJACK_MISTAKE_EDGE: 0.01, // 每次偏離基本策略多送的 EV
+  BLACKJACK_NATURAL_SANITY: 5, // 拿到黑傑克
+  BLACKJACK_REVEAL_MS: 1500, // 莊家翻牌動畫
+
+  // 幣圈合約
+  CRYPTO_MIN_MARGIN: 500,
+  CRYPTO_MAX_LEVERAGE: 50,
+  CRYPTO_FEE: 0.0005, // 開倉 + 平倉各一次，乘名目部位
+  CRYPTO_SLIPPAGE: 0.0002,
+  LIQ_RATIO: 0.9, // 未實現虧損 >= 保證金 x 0.9 即爆倉
+  CRYPTO_LIQ_SANITY: 15,
+  CRYPTO_CANDLES_PER_SECOND: 3,
+  CRYPTO_DEFAULT_LEVERAGE: 10,
+  CRYPTO_LEVERAGE_PRESETS: [2, 5, 10, 25, 50],
+  CRYPTO_TP_OPTIONS: [50, 100, 200], // 停利，保證金報酬率 %
+  CRYPTO_SL_OPTIONS: [25, 50], // 停損，保證金報酬率 %
+  CRYPTO_LIQ_FLASH_MS: 700, // 爆倉紅閃
+
+  // 股票日線
+  STOCK_FEE: 0.001425, // 台股手續費，買賣各一次
+  STOCK_TAX: 0.003, // 證交稅，賣出時
+  STOCK_MIN_LOT: 1000,
+  STOCK_TRADE_SANITY_COST: 3,
+  STOCK_UNDERWATER_RATIO: 0.2, // 浮虧超過 20% 每天額外扣精神
+  STOCK_UNDERWATER_SANITY: 3,
+  STOCK_MARKET_SIZE: 5,
+  STOCK_VISIBLE_HISTORY: 20, // 進場時先看得到的過去天數
+  STOCK_START_OFFSET_MAX: 40, // 切片起點隨機偏移，同一段每局長得不一樣
+  STOCK_CHAIN_SEGMENTS: 3, // 每支股票預先接續幾段，夠玩 300 天以上
+
+  // 刮刮樂
+  SCRATCH_TICKETS: [
+    { price: 100, jackpot: 10000 },
+    { price: 200, jackpot: 100000 },
+    { price: 500, jackpot: 1000000 },
+  ],
+  // 非頭獎獎項：面額倍數與機率。回本那級佔 RTP 的七成，製造「幾乎沒輸」的感覺。
+  SCRATCH_TIERS: [
+    { multiplier: 1, p: 0.385 },
+    { multiplier: 2, p: 0.015 },
+    { multiplier: 5, p: 0.01 },
+    { multiplier: 20, p: 0.004 },
+  ],
+  SCRATCH_JACKPOT_RTP: 0.005, // 頭獎佔的 RTP，機率 = 此值 x 面額 / 頭獎
+  SCRATCH_RTP: 0.55, // 上面兩張表加總必須等於這個值（有測試鎖住）
+  SCRATCH_SANITY_COST: 2, // 每張
+  SCRATCH_REVEAL_RATIO: 0.6, // 刮開六成自動揭曉
+
+  // NBA
+  NBA_MIN_BET: 200,
+  NBA_VIG: 0.045,
+  PARLAY_MIN_LEGS: 2,
+  PARLAY_MAX_LEGS: 6,
+  PARLAY_MAX_PER_DAY: 3,
+  PARLAY_WIN_SANITY: 10,
+  PARLAY_LOSS_SANITY: 5,
+  NBA_NO_GAME_DAY_RATE: 0.15, // 打亂賽程時插入的無賽事日比例
+  NBA_REVEAL_MS: 2000, // 晚上逐張揭曉的間隔
+
+  DAY_TARGET_SECONDS: 30,
+
+  // 排行榜與分析紀錄
+  LEADERBOARD_SIZE: 10,
+  RUNLOG_SIZE: 50, // localStorage 只留最近 50 局
+  DEATH_CARD_WIDTH: 1080,
+  DEATH_CARD_HEIGHT: 1350,
+
+  // 事件表（NIGHT 觸發，每晚最多一個；weight 總和 100）
+  EVENT_TABLE: [
+    { id: 'nothing', weight: 60 },
+    { id: 'bike_broke', weight: 8, cash: -2000 },
+    { id: 'friend_repays', weight: 6, cash: 1500 },
+    { id: 'overtime_pay', weight: 6, cash: 400, requiresWork: true },
+    { id: 'rent_hike', weight: 5, expenseMultiplier: 1.1 },
+    { id: 'found_money', weight: 5, cash: 500 },
+    { id: 'sick', weight: 5, sanity: -10, blocksWorkTomorrow: true },
+    { id: 'insider_tip', weight: 5, insiderTip: true },
+  ] as const satisfies readonly EventDef[],
+} as const;
+
+export type Config = typeof CONFIG;
