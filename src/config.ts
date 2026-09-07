@@ -44,8 +44,14 @@ export const CONFIG = {
   BACCARAT_COMMISSION: 0.05, // 莊贏抽 5%
   BACCARAT_TIE_PAYOUT: 8, // 和局 8:1
   BACCARAT_EDGE: { banker: 0.0106, player: 0.0124, tie: 0.144 },
-  BACCARAT_REVEAL_MS: 2000, // 發牌動畫
+  BACCARAT_REVEAL_MS: 2000, // 發牌動畫（舊值，牌桌場景改用下面的分段時間）
   BACCARAT_RESULT_MS: 1000, // 結果停留
+  BACCARAT_DEAL_STEP_MS: 240, // 牌靴滑出一張的間隔
+  BACCARAT_SLIDE_MS: 420, // 一張牌從牌靴滑到牌位
+  BACCARAT_FLIP_STEP_MS: 300, // 翻牌間隔
+  BACCARAT_FLIP_MS: 460, // 翻一張牌
+  BACCARAT_SETTLE_MS: 1500, // 派彩動畫（籌碼飛走、區域高亮）停留
+  BACCARAT_CHIPS: [100, 500, 1000, 5000], // 牌桌籌碼面額，另有 MAX
 
   // 21 點
   BLACKJACK_MIN_BET: 100,
@@ -113,6 +119,13 @@ export const CONFIG = {
   NBA_REVEAL_MS: 2000, // 晚上逐張揭曉的間隔
 
   DAY_TARGET_SECONDS: 30,
+
+  // 打工 / 休息過場動畫
+  WORK_ANIM_MS: 1700, // 快轉勞動畫面
+  WORK_SETTLE_MS: 1000, // 結算飄字停留
+  REST_ANIM_MS: 1900,
+  REST_SETTLE_MS: 1100,
+  SCENE_CURTAIN_MS: 280, // 場景切換遮幕收合 / 拉開各一段
 
   // 開局背景：覆蓋起手數值
   BACKGROUNDS: [

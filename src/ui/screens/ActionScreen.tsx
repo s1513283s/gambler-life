@@ -9,6 +9,8 @@ import { useGame } from '../../store';
 import { VENUE_TIER, type JobId, type VenueKind } from '../../types';
 import { stockMarketValue } from '../../venues/stocks';
 import { Icon } from '../components/Icon';
+import { RestModal, WorkModal } from '../components/WorkModal';
+import { useScene } from '../sceneStore';
 import { VENUE_CARDS } from '../venueCards';
 import { LoanSharkScreen } from './LoanSharkScreen';
 import { NbaScreen } from './NbaScreen';
@@ -19,10 +21,15 @@ const ACTION_LABEL = { WORK: '打工', REST: '休息', GAMBLE: '去了場子', N
 
 const TIER_HINT: Record<1 | 2 | 3, string> = { 1: '先向阿龍借一次錢', 2: '累計借款或在地下場輸夠多', 3: '淨值峰值 30 萬' };
 
+/** 主行動的過場：先播畫面，播完才真的 dispatch */
+type Overlay = { kind: 'work'; job: JobId; wage: number; sanityCost: number } | { kind: 'rest'; sanityGain: number } | null;
+
 export function ActionScreen() {
   const state = useGame((s) => s.state);
   const dispatch = useGame((s) => s.dispatch);
   const [panel, setPanel] = useState<'none' | 'loan' | 'stocks' | 'nba' | 'shop'>('none');
+  const [overlay, setOverlay] = useState<Overlay>(null);
+  const transitionTo = useScene((s) => s.transitionTo);
 
   if (panel === 'loan') return <LoanSharkScreen onClose={() => setPanel('none')} />;
   if (panel === 'shop') return <ShopScreen onClose={() => setPanel('none')} />;
@@ -38,9 +45,30 @@ export function ActionScreen() {
   const vipOpen = isUnlocked(state, 'lending');
   const promised = state.promiseUntilDay >= state.day;
 
+  // 打工先用同一個純函數算出薪資（外送的隨機值也用同一顆 rng），reducer 之後會算出一模一樣的數字
+  const startWork = (job: JobId) => {
+    if (!canWorkToday(state) || overlay !== null) return;
+    const pay = jobWage(state, job);
+    setOverlay({ kind: 'work', job, wage: pay.wage, sanityCost: Math.min(pay.sanityCost, state.sanity) });
+  };
+  const startRest = () => {
+    if (used || overlay !== null) return;
+    // 先記下實際會加多少（精神上限 100），dispatch 之後 state 已經變了
+    setOverlay({ kind: 'rest', sanityGain: Math.min(CONFIG.REST_SANITY_GAIN, CONFIG.SANITY_MAX - state.sanity) });
+  };
+  // 百家樂是獨立的全螢幕牌桌，帶遮幕切過去
+  const enterVenue = (venue: VenueKind, vip = false) => {
+    if (venue === 'baccarat') transitionTo(() => dispatch({ type: 'ENTER_VENUE', venue, vip }));
+    else dispatch({ type: 'ENTER_VENUE', venue, vip });
+  };
+
   return (
     <main className="screen">
       {pending !== null && <UnlockDialog ids={pending} onAck={() => dispatch({ type: 'ACK_UNLOCK' })} />}
+      {overlay?.kind === 'work' && (
+        <WorkModal job={overlay.job} wage={overlay.wage} sanityCost={overlay.sanityCost} onCommit={() => dispatch({ type: 'WORK', job: overlay.job })} onDone={() => setOverlay(null)} />
+      )}
+      {overlay?.kind === 'rest' && <RestModal sanityGain={overlay.sanityGain} onCommit={() => dispatch({ type: 'REST' })} onDone={() => setOverlay(null)} />}
 
       <section className="card card-hero">
         <div className="hero-row">
@@ -85,7 +113,7 @@ export function ActionScreen() {
             const pay = jobWage(state, j.id);
             const range = j.wageMax > j.wageMin;
             return (
-              <button key={j.id} className={`btn job-btn job-${j.id}`} disabled={!canWorkToday(state)} onClick={() => dispatch({ type: 'WORK', job: j.id as JobId })}>
+              <button key={j.id} className={`btn job-btn job-${j.id}`} disabled={!canWorkToday(state) || overlay !== null} onClick={() => startWork(j.id as JobId)}>
                 <Icon name="work" size={20} />
                 <span className="btn-title">{j.name}</span>
                 <span className="btn-sub">
@@ -95,7 +123,7 @@ export function ActionScreen() {
               </button>
             );
           })}
-          <button className="btn job-btn life-rest" disabled={used} onClick={() => dispatch({ type: 'REST' })}>
+          <button className="btn job-btn life-rest" disabled={used || overlay !== null} onClick={startRest}>
             <Icon name="rest" size={20} />
             <span className="btn-title">休息</span>
             <span className="btn-sub">精神 +{CONFIG.REST_SANITY_GAIN}</span>
@@ -121,7 +149,7 @@ export function ActionScreen() {
                 className={`venue-card ${unlocked ? '' : 'venue-locked'}`}
                 style={{ '--accent': v.accent } as React.CSSProperties}
                 disabled={used || !unlocked}
-                onClick={() => dispatch({ type: 'ENTER_VENUE', venue: v.kind })}
+                onClick={() => enterVenue(v.kind)}
               >
                 <span className="venue-icon">
                   <Icon name={unlocked ? v.icon : 'lock'} size={26} />
@@ -133,7 +161,7 @@ export function ActionScreen() {
             );
           })}
           {vipOpen && (
-            <button className="venue-card venue-vip" style={{ '--accent': '#ffe08a' } as React.CSSProperties} disabled={used} onClick={() => dispatch({ type: 'ENTER_VENUE', venue: 'baccarat', vip: true })}>
+            <button className="venue-card venue-vip" style={{ '--accent': '#ffe08a' } as React.CSSProperties} disabled={used} onClick={() => enterVenue('baccarat', true)}>
               <span className="venue-icon">
                 <Icon name="baccarat" size={26} />
               </span>

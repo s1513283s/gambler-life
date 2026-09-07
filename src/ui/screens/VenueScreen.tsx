@@ -1,5 +1,4 @@
 import { useGame } from '../../store';
-import { BaccaratScreen } from './BaccaratScreen';
 import { BlackjackScreen } from './BlackjackScreen';
 import { CryptoScreen } from './CryptoScreen';
 import { LongmenScreen } from './LongmenScreen';
@@ -13,7 +12,7 @@ export function VenueScreen() {
   if (venue === null) return null;
   switch (venue.kind) {
     case 'baccarat':
-      return <BaccaratScreen session={venue} />;
+      return null; // App 直接切到全螢幕的 BaccaratTable，不走大廳框架
     case 'blackjack':
       return <BlackjackScreen session={venue} />;
     case 'scratch':

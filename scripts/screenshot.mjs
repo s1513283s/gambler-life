@@ -1,7 +1,8 @@
 /**
  * 用本機 Chrome 的 DevTools Protocol 對 preview 伺服器截圖，不需要 playwright。
- *   node scripts/screenshot.mjs <url> <out.png> [saveJson]
+ *   node scripts/screenshot.mjs <url> <out.png> [saveJson] [clickText] [waitMs]
  * saveJson 會在載入前寫進 localStorage 的 gambler-life:save，用來截特定畫面。
+ * clickText 用 | 分隔可以連點多個按鈕（每次間隔 700ms）；waitMs 是截圖前額外等待，用來等動畫播到某一格。
  */
 import { spawn } from 'node:child_process';
 import { existsSync, writeFileSync } from 'node:fs';
@@ -11,7 +12,7 @@ import { join } from 'node:path';
 const CHROME = ['C:/Program Files/Google/Chrome/Application/chrome.exe', 'C:/Program Files (x86)/Google/Chrome/Application/chrome.exe'].find(existsSync);
 if (!CHROME) throw new Error('chrome not found');
 
-const [url, out, saveJson, clickText] = process.argv.slice(2);
+const [url, out, saveJson, clickText, waitMs] = process.argv.slice(2);
 const port = 9222 + Math.floor(Math.random() * 500);
 const profile = join(tmpdir(), `gl-shot-${port}`);
 const chrome = spawn(CHROME, [
@@ -69,10 +70,12 @@ if (saveJson) {
   await sleep(1800);
 }
 if (clickText) {
-  await send('Runtime.evaluate', { expression: `[...document.querySelectorAll('button')].find((b) => b.textContent.includes(${JSON.stringify(clickText)}))?.click()` });
-  await sleep(700);
+  for (const text of clickText.split('|')) {
+    await send('Runtime.evaluate', { expression: `[...document.querySelectorAll('button')].find((b) => b.textContent.includes(${JSON.stringify(text)}))?.click()` });
+    await sleep(700);
+  }
 }
-await sleep(600);
+await sleep(waitMs ? Number(waitMs) : 600);
 const shot = await send('Page.captureScreenshot', { format: 'png' });
 writeFileSync(out, Buffer.from(shot.result.data, 'base64'));
 console.log('wrote', out);

@@ -3,7 +3,7 @@
  */
 const SOUND_KEY = 'gambler-life:sound';
 
-export type SoundKind = 'deal' | 'win' | 'loss' | 'bigwin' | 'liquidated' | 'death' | 'coin';
+export type SoundKind = 'deal' | 'win' | 'loss' | 'bigwin' | 'liquidated' | 'death' | 'coin' | 'chip' | 'card';
 
 let ctx: AudioContext | null = null;
 let enabled = readEnabled();
@@ -59,6 +59,15 @@ export function playSound(kind: SoundKind): void {
   switch (kind) {
     case 'deal':
       tone(880, 0, 0.06, 'square', 0.05);
+      break;
+    case 'chip':
+      // 籌碼敲桌：短促的兩聲喀
+      tone(1500, 0, 0.03, 'square', 0.05);
+      tone(900, 0.03, 0.05, 'triangle', 0.06);
+      break;
+    case 'card':
+      // 紙牌滑出：一聲輕擦
+      tone(2400, 0, 0.025, 'sawtooth', 0.025);
       break;
     case 'coin':
       tone(1320, 0, 0.08, 'triangle', 0.08);

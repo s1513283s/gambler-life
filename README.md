@@ -55,5 +55,8 @@ BASE_PATH=/gambler-life/ npm run build
 - `src/data/` 資料格式、驗證、動態載入。
 - `src/sim/` 無頭模擬器與策略機器人。
 - `src/ui/` 畫面。所有動畫都從狀態推導，重整後從同一狀態續玩。
+  - `sceneStore.ts` 場景切換遮幕；`scenes.css` 過場、情境動畫與牌桌的樣式。
+  - `components/WorkModal.tsx` 打工 / 休息的情境過場：先播畫面，播完（或跳過）那一刻才 dispatch。
+  - `screens/BaccaratTable.tsx` 百家樂全螢幕牌桌，發牌節奏在 `baccaratTimeline.ts`，籌碼拆分在 `baccaratChips.ts`。
 - `src/analytics/` 排行榜與 run 紀錄。標題點五下可匯出。
 - `scripts/` 資料前處理與 build 前驗證。
